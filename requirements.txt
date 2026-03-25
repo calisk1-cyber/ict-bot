@@ -1,0 +1,12 @@
+flask
+flask-cors
+yfinance
+pandas
+pandas-ta
+openai
+python-dotenv
+requests
+fear-and-greed
+alpaca-py
+pytz
+oandapyV20

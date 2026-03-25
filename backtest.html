@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ICT Backtest Engine Dashboard</title>
+    <!-- Tailwind CSS (for 0 dependency styling) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #0f172a; color: #f8fafc; }
+        .glass-panel { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 1rem; }
+        .grid-button.active { background-color: #3b82f6; color: white; border-color: #3b82f6; }
+        .grid-button { border: 1px solid #334155; color: #94a3b8; transition: all 0.2s; }
+        .grid-button:hover:not(.active) { border-color: #475569; color: #cbd5e1; }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+        .loading-text { display: none; margin-top: 10px; font-size: 0.9rem; color: #94a3b8; animation: pulse 1s infinite alternate; }
+        @keyframes pulse { from { opacity: 0.6; } to { opacity: 1; } }
+    </style>
+</head>
+<body class="min-h-screen p-4 md:p-6 lg:p-8 flex flex-col md:flex-row gap-6">
+
+    <!-- SOL PANEL: AYARLAR -->
+    <aside class="glass-panel w-full md:w-[380px] shrink-0 p-6 flex flex-col gap-6 h-fit sticky top-6">
+        <div>
+            <h1 class="text-xl font-bold bg-gradient-to-r from-blue-400 to-teal-400 bg-clip-text text-transparent flex items-center gap-2">
+                <svg class="w-6 h-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                ICT Backtest Engine
+            </h1>
+            <p class="text-xs text-slate-400 mt-1">Smart Money Concepts & AI Filter</p>
+        </div>
+
+        <!-- 1. Ticker Input -->
+        <div class="space-y-3">
+            <label class="text-sm font-semibold text-slate-300">İzleme Listesi (Ticker)</label>
+            <input type="text" id="tickerInput" value="EURUSD=X" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-3 text-white font-mono text-lg outline-none focus:border-blue-500 transition-colors" placeholder="Örn: AAPL, BTC-USD">
+            
+            <div class="flex flex-wrap gap-2 text-xs">
+                <button class="quick-ticker px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-blue-400 transition" data-val="PLTR, SOFI, BBAI">Tech</button>
+                <button class="quick-ticker px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-teal-400 transition" data-val="EURUSD=X, GBPUSD=X">Forex</button>
+                <button class="quick-ticker px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-orange-400 transition" data-val="BTC-USD, ETH-USD">Crypto</button>
+            </div>
+        </div>
+
+        <!-- 2. Periyot Seçimi -->
+        <div class="space-y-3">
+            <label class="text-sm font-semibold text-slate-300">Zaman Periyodu</label>
+            <div class="grid grid-cols-3 gap-2 text-xs font-medium" id="periodGrid">
+                <button class="grid-button active rounded-md py-2" data-val="7d">7 Gün (1m)</button>
+                <button class="grid-button rounded-md py-2" data-val="30d">30 Gün (5m)</button>
+                <button class="grid-button rounded-md py-2" data-val="90d">3 Ay (15m)</button>
+                <button class="grid-button rounded-md py-2" data-val="180d">6 Ay (1s)</button>
+                <button class="grid-button rounded-md py-2" data-val="1y">1 Yıl (1s)</button>
+                <button class="grid-button rounded-md py-2" data-val="5y">5 Yıl (1g)</button>
+            </div>
+        </div>
+
+        <!-- 3. Strateji Ayarları -->
+        <div class="space-y-4 pt-2 border-t border-slate-700/50">
+            <label class="text-sm font-semibold text-slate-300">Strateji Ayarları</label>
+            
+            <div class="flex items-center justify-between">
+                <span class="text-xs text-slate-400">ICT Seansı</span>
+                <select id="ictSession" class="bg-slate-800 border border-slate-700 text-xs rounded px-2 py-1 text-white outline-none">
+                    <option value="both">Londra + NY</option>
+                    <option value="london">Sadece Londra</option>
+                    <option value="ny">Sadece NY</option>
+                    <option value="all">Filtresiz (24s)</option>
+                </select>
+            </div>
+
+            <div class="flex items-center justify-between">
+                <span class="text-xs text-slate-400">AI Filtresi (GPT-4o)</span>
+                <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" id="aiFilterToggle" class="sr-only peer" checked>
+                    <div class="w-9 h-5 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-500"></div>
+                </label>
+            </div>
+
+            <div>
+                <div class="flex justify-between text-xs text-slate-400 mb-1">
+                    <span>Risk / İşlem</span>
+                    <span id="riskLabel">%1</span>
+                </div>
+                <input type="range" id="riskSlider" min="0.5" max="5" step="0.5" value="1" class="w-full h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer">
+            </div>
+
+            <div>
+                <label class="text-xs text-slate-400 block mb-1">Başlangıç Bakiye ($)</label>
+                <input type="number" id="initBalance" value="1000" class="w-full bg-slate-800 border border-slate-700 rounded text-sm px-3 py-1.5 text-white outline-none">
+            </div>
+        </div>
+
+        <!-- 4. Risk Limitleri -->
+        <div class="space-y-3 pt-2 border-t border-slate-700/50">
+            <label class="text-sm font-semibold text-slate-300">Günlük Risk Limitleri</label>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <span class="text-[10px] text-slate-500 uppercase">Max Kayıp (%)</span>
+                    <input type="number" id="dailyLossLimit" value="-2" class="w-full bg-slate-800 border border-slate-700 rounded text-sm px-2 py-1 text-red-400 outline-none mt-1">
+                </div>
+                <div>
+                    <span class="text-[10px] text-slate-500 uppercase">Kâr Hedefi (%)</span>
+                    <input type="number" id="dailyProfitTarget" value="5" class="w-full bg-slate-800 border border-slate-700 rounded text-sm px-2 py-1 text-green-400 outline-none mt-1">
+                </div>
+                <div class="col-span-2">
+                    <span class="text-[10px] text-slate-500 uppercase">Max İşlem Adedi</span>
+                    <input type="number" id="maxTrades" value="6" class="w-full bg-slate-800 border border-slate-700 rounded text-sm px-2 py-1 text-white outline-none mt-1">
+                </div>
+            </div>
+        </div>
+
+        <!-- Start Button -->
+        <div class="mt-auto pt-4 relative">
+            <button id="startBtn" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold py-3 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors shadow-lg shadow-blue-500/20">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                BACKTEST BAŞLAT
+            </button>
+            
+            <!-- Loading States -->
+            <div id="loadingStates" class="absolute w-full text-center mt-3">
+                <p id="load1" class="loading-text">⚡ Veri çekiliyor...</p>
+                <p id="load2" class="loading-text">📊 ICT sinyalleri hesaplanıyor...</p>
+                <p id="load3" class="loading-text">🤖 AI filtreleri uygulanıyor...</p>
+                <p id="load4" class="loading-text">📈 Rapor hazırlanıyor...</p>
+            </div>
+        </div>
+    </aside>
+
+    <!-- SAĞ PANEL: SONUÇLAR -->
+    <main class="flex-1 flex flex-col gap-6 relative">
+        <div id="demoBadge" class="hidden absolute top-0 right-0 bg-orange-500 text-white text-[10px] font-bold px-2 py-1 rounded-bl-lg uppercase tracking-wider z-10 shadow-lg">DEMO MOD</div>
+        
+        <!-- Üst Grid: 6 Metrik -->
+        <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
+            <div class="glass-panel p-4 flex flex-col">
+                <span class="text-xs text-slate-400 uppercase tracking-wider">Net PnL</span>
+                <span id="resPnl" class="text-2xl font-bold text-slate-200 mt-1">-%</span>
+            </div>
+            <div class="glass-panel p-4 flex flex-col">
+                <span class="text-xs text-slate-400 uppercase tracking-wider">Win Rate</span>
+                <span id="resWinRate" class="text-2xl font-bold text-slate-200 mt-1">-%</span>
+            </div>
+            <div class="glass-panel p-4 flex flex-col">
+                <span class="text-xs text-slate-400 uppercase tracking-wider">Toplam İşlem</span>
+                <span id="resTotal" class="text-2xl font-bold text-slate-200 mt-1">-</span>
+            </div>
+            <div class="glass-panel p-4 flex flex-col">
+                <span class="text-xs text-slate-400 uppercase tracking-wider">Max Drawdown</span>
+                <span id="resDD" class="text-2xl font-bold text-slate-200 mt-1">-%</span>
+            </div>
+            <div class="glass-panel p-4 flex flex-col">
+                <span class="text-xs text-slate-400 uppercase tracking-wider">En İyi Gün</span>
+                <span id="resBestDay" class="text-2xl font-bold text-slate-200 mt-1">-%</span>
+            </div>
+            <div class="glass-panel p-4 flex flex-col">
+                <span class="text-xs text-slate-400 uppercase tracking-wider">Sharpe Ratio</span>
+                <span id="resSharpe" class="text-2xl font-bold text-slate-200 mt-1">-</span>
+            </div>
+        </div>
+
+        <!-- Orta Kısım: Grafik -->
+        <div class="glass-panel p-4 flex-1 min-h-[300px] flex flex-col relative">
+            <h3 class="text-sm font-semibold text-slate-300 mb-4">Equity Curve (Bakiye Gelişimi)</h3>
+            <div class="flex-1 w-full h-full relative">
+                <canvas id="equityChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Alt Kısım: Tablo -->
+        <div class="glass-panel p-0 overflow-hidden flex flex-col h-[300px]">
+            <div class="p-4 border-b border-slate-700/50 bg-slate-800/30">
+                <h3 class="text-sm font-semibold text-slate-300">Son İşlemler</h3>
+            </div>
+            <div class="overflow-y-auto flex-1 p-2">
+                <table class="w-full text-left border-collapse text-xs">
+                    <thead>
+                        <tr class="text-slate-400 border-b border-slate-800">
+                            <th class="p-2 font-medium">Tarih</th>
+                            <th class="p-2 font-medium">Hisse</th>
+                            <th class="p-2 font-medium">Yön</th>
+                            <th class="p-2 font-medium">Giriş</th>
+                            <th class="p-2 font-medium">Çıkış</th>
+                            <th class="p-2 font-medium">PnL</th>
+                            <th class="p-2 font-medium">R:R</th>
+                            <th class="p-2 font-medium">AI Kararı</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tradesTableBody">
+                        <!-- Rows will go here -->
+                        <tr><td colspan="8" class="text-center p-8 text-slate-500">Backtest başlatılmadı.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // UI Interaction
+        document.getElementById('riskSlider').addEventListener('input', e => {
+            document.getElementById('riskLabel').innerText = `%${e.target.value}`;
+        });
+
+        document.querySelectorAll('.quick-ticker').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.getElementById('tickerInput').value = btn.getAttribute('data-val');
+            });
+        });
+
+        let selectedPeriod = '7d';
+        document.querySelectorAll('#periodGrid button').forEach(btn => {
+            btn.addEventListener('click', e => {
+                document.querySelectorAll('#periodGrid button').forEach(b => b.classList.remove('active'));
+                e.target.classList.add('active');
+                selectedPeriod = e.target.getAttribute('data-val');
+            });
+        });
+
+        // Chart Instance
+        let equityChart = null;
+        function initChart() {
+            const ctx = document.getElementById('equityChart').getContext('2d');
+            equityChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Balance ($)',
+                        data: [],
+                        borderColor: '#10b981',
+                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        pointHitRadius: 10,
+                        fill: true,
+                        tension: 0.1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { grid: { color: 'rgba(255,255,255,0.05)' }, border: { display: false }, ticks: { color: '#64748b' } },
+                        y: { grid: { color: 'rgba(255,255,255,0.05)' }, border: { display: false }, ticks: { color: '#64748b' } }
+                    }
+                }
+            });
+        }
+        initChart();
+
+        // Loading Animator
+        async function runLoadingSequence() {
+            const loadStates = ['load1', 'load2', 'load3', 'load4'];
+            for(let id of loadStates) document.getElementById(id).style.display = 'none';
+            document.getElementById('startBtn').style.opacity = '0.5';
+            document.getElementById('startBtn').disabled = true;
+
+            for(let id of loadStates) {
+                document.getElementById(id).style.display = 'block';
+                await new Promise(r => setTimeout(r, 800));
+                document.getElementById(id).style.display = 'none';
+            }
+        }
+
+        function restoreBtn() {
+            document.getElementById('startBtn').style.opacity = '1';
+            document.getElementById('startBtn').disabled = false;
+        }
+
+        // Handle Form Submit
+        document.getElementById('startBtn').addEventListener('click', async () => {
+            const payload = {
+                ticker: document.getElementById('tickerInput').value,
+                period: selectedPeriod,
+                initial_balance: parseFloat(document.getElementById('initBalance').value),
+                risk_per_trade: parseFloat(document.getElementById('riskSlider').value),
+                daily_loss_limit: parseFloat(document.getElementById('dailyLossLimit').value),
+                daily_profit_target: parseFloat(document.getElementById('dailyProfitTarget').value),
+                max_daily_trades: parseInt(document.getElementById('maxTrades').value),
+                ict_session: document.getElementById('ictSession').value,
+                ai_filter: document.getElementById('aiFilterToggle').checked
+            };
+
+            const loadingTask = runLoadingSequence();
+            
+            try {
+                // To support both local running via script directly and standard api paths
+                let apiUrl = 'http://localhost:3000/api/backtest'; 
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                
+                if (!response.ok) throw new Error("Backend Error");
+                
+                const data = await response.json();
+                await loadingTask; // Wait for animation to finish
+                renderResults(data);
+                document.getElementById('demoBadge').classList.add('hidden');
+                
+            } catch (err) {
+                console.error("Fetch failed, falling back to DEMO mode", err);
+                await loadingTask;
+                renderDemoMode(payload);
+            } finally {
+                restoreBtn();
+            }
+        });
+
+        // Demo Data Generator
+        function renderDemoMode(p) {
+            document.getElementById('demoBadge').classList.remove('hidden');
+            
+            const trades = [];
+            let bal = p.initial_balance;
+            const curve = [bal];
+            const labels = ['Start'];
+            
+            let wins = 0;
+            let total = Math.floor(Math.random() * 50) + 10;
+            
+            for(let i=1; i<=total; i++) {
+                const isWin = Math.random() > 0.48; // 52% winrate
+                if (isWin) wins++;
+                
+                const pnl = isWin ? (bal * (p.risk_per_trade/100) * 2) : -(bal * (p.risk_per_trade/100));
+                bal += pnl;
+                curve.push(bal);
+                labels.push(`Trade ${i}`);
+                
+                trades.push({
+                    date: `2026-03-${String(10 + Math.floor(i/3)).padStart(2, '0')} 15:30`,
+                    ticker: p.ticker.split(',')[0].trim(),
+                    dir: Math.random() > 0.5 ? 'LONG' : 'SHORT',
+                    entry: (150 + Math.random()*10).toFixed(2),
+                    exit: (150 + Math.random()*10).toFixed(2),
+                    pnl_pct: isWin ? 5.2 : -2.6,
+                    ai: isWin ? 'ONAYLA' : (Math.random()>0.8?'RED':'ONAYLA')
+                });
+            }
+            
+            const netPnl = ((bal - p.initial_balance) / p.initial_balance) * 100;
+            
+            renderResults({
+                metrics: {
+                    net_pnl: netPnl,
+                    win_rate: (wins/total)*100,
+                    total_trades: total,
+                    max_drawdown: -8.4,
+                    best_day_pnl: 12.3,
+                    sharpe_ratio: 1.85
+                },
+                equity: { labels, data: curve },
+                trades: trades.reverse()
+            });
+        }
+
+        // Render Data to UI
+        function renderResults(data) {
+            const m = data.metrics;
+            const pColor = m.net_pnl >= 0 ? 'text-green-400' : 'text-red-400';
+            document.getElementById('resPnl').innerHTML = `<span class="${pColor}">${m.net_pnl > 0 ? '+' : ''}${m.net_pnl.toFixed(2)}%</span>`;
+            document.getElementById('resWinRate').innerText = `${m.win_rate.toFixed(1)}%`;
+            document.getElementById('resTotal').innerText = m.total_trades;
+            document.getElementById('resDD').innerText = `${m.max_drawdown.toFixed(2)}%`;
+            document.getElementById('resBestDay').innerHTML = `<span class="text-green-400">+${m.best_day_pnl.toFixed(2)}%</span>`;
+            document.getElementById('resSharpe').innerText = m.sharpe_ratio ? m.sharpe_ratio.toFixed(2) : '-';
+
+            // Chart
+            equityChart.data.labels = data.equity.labels;
+            equityChart.data.datasets[0].data = data.equity.data;
+            equityChart.update();
+
+            // Table
+            const tbody = document.getElementById('tradesTableBody');
+            tbody.innerHTML = '';
+            
+            if (data.trades.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" class="text-center p-8 text-slate-500">Bu parametrelerle işlem bulunamadı.</td></tr>';
+                return;
+            }
+
+            data.trades.forEach(t => {
+                const tr = document.createElement('tr');
+                tr.className = 'border-b border-slate-800/50 hover:bg-slate-800/30 transition-colors';
+                const pColor = t.pnl_pct >= 0 ? 'text-green-400' : 'text-red-400';
+                const pSign = t.pnl_pct > 0 ? '+' : '';
+                const aiBadge = t.ai === 'ONAYLA' 
+                    ? '<span class="bg-green-500/20 text-green-400 px-2 py-0.5 rounded text-[10px] font-bold">ONAYLA</span>'
+                    : '<span class="bg-orange-500/20 text-orange-400 px-2 py-0.5 rounded text-[10px] font-bold">RED</span>';
+
+                tr.innerHTML = `
+                    <td class="p-2 whitespace-nowrap">${t.date}</td>
+                    <td class="p-2 font-medium">${t.ticker}</td>
+                    <td class="p-2"><span class="${t.dir==='LONG'?'text-blue-400':'text-purple-400'}">${t.dir}</span></td>
+                    <td class="p-2">${t.entry}</td>
+                    <td class="p-2">${t.exit}</td>
+                    <td class="p-2 font-bold ${pColor}">${pSign}${t.pnl_pct.toFixed(2)}%</td>
+                    <td class="p-2 text-slate-400">1:2</td>
+                    <td class="p-2">${aiBadge}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+    </script>
+</body>
+</html>

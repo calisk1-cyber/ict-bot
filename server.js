@@ -1,0 +1,71 @@
+require('dotenv').config();
+const express = require('express');
+const cors = require('cors');
+const path = require('path');
+
+const app = express();
+const PORT = 3000;
+
+app.use(cors());
+app.use(express.json());
+
+// Statik dosyaları sun (index.html vs.)
+app.use(express.static(path.join(__dirname)));
+
+// Groq API proxy endpoint
+app.post('/api/analyze', async (req, res) => {
+  const apiKey = process.env.GROQ_API_KEY;
+
+  if (!apiKey) {
+    return res.status(500).json({
+      error: { message: 'GROQ_API_KEY bulunamadı. Lütfen .env dosyasını kontrol et.' }
+    });
+  }
+
+  // Gelen Anthropic-format isteği Groq/OpenAI formatına çevir
+  const { system, messages } = req.body;
+
+  const groqMessages = [];
+  if (system) groqMessages.push({ role: 'system', content: system });
+  (messages || []).forEach(m => groqMessages.push({ role: m.role, content: m.content }));
+
+  const groqBody = {
+    model: 'llama-3.3-70b-versatile',
+    messages: groqMessages,
+    max_tokens: 4000,
+    temperature: 0.7
+  };
+
+  try {
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify(groqBody)
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      const msg = data?.error?.message || `Groq API hatası: ${response.status}`;
+      return res.status(response.status).json({ error: { message: msg } });
+    }
+
+    // Groq yanıtını Anthropic formatına çevir (index.html uyumlu)
+    const text = data?.choices?.[0]?.message?.content || '';
+    res.json({
+      content: [{ type: 'text', text }]
+    });
+
+  } catch (err) {
+    res.status(500).json({ error: { message: `Sunucu hatası: ${err.message}` } });
+  }
+});
+
+app.listen(PORT, () => {
+  console.log(`\n✅ AI Hedge Fund sunucusu çalışıyor! (Groq - Llama 3.3 70B)`);
+  console.log(`🌐 Tarayıcıda aç: http://localhost:${PORT}`);
+  console.log(`\nDurdurmak için: Ctrl+C\n`);
+});

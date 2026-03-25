@@ -119,3 +119,30 @@ def detect_market_regime(df, lookback=24):
         return "CHOPPY", curr_er
     else:
         return "NORMAL", curr_er
+
+def get_htf_bias(ticker):
+    """
+    4H ve 1D grafiklerde ana yönü tayin eder.
+    Döner: 'BULLISH', 'BEARISH', 'NEUTRAL'
+    """
+    try:
+        # 1. 4H Verisini Çek
+        df_4h = download_full_history(ticker, interval='1h', period='7d') # 4H yerine 1H kümülatif bakabiliriz
+        if df_4h.empty: return "NEUTRAL"
+        
+        # Basit EMA ve RSI Filtresi
+        ema_20 = ta.ema(df_4h['Close'], length=20)
+        rsi = ta.rsi(df_4h['Close'], length=14)
+        
+        last_price = df_4h['Close'].iloc[-1]
+        last_ema = ema_20.iloc[-1]
+        last_rsi = rsi.iloc[-1]
+        
+        if last_price > last_ema and last_rsi > 50:
+            return "BULLISH"
+        elif last_price < last_ema and last_rsi < 50:
+            return "BEARISH"
+        else:
+            return "NEUTRAL"
+    except:
+        return "NEUTRAL"

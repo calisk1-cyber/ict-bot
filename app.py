@@ -13,9 +13,10 @@ import oandapyV20.endpoints.orders as orders
 import oandapyV20.endpoints.instruments as instruments
 from ict_utils import (
     is_silver_bullet_zone, is_macro_time, find_fvg_v3, 
-    find_ifvg, find_turtle_soup, find_inducement
+    find_ifvg, find_turtle_soup, find_inducement, detect_market_regime
 )
 from news_utils import is_news_volatile
+from trade_logger import log_ict_attempt
 
 # --- 1. CONFIGURATION & ENV ---
 base_dir = os.path.dirname(os.path.abspath(__file__))
@@ -152,10 +153,23 @@ def trading_routine(ticker):
             return
 
         # 1. Normal M5 Analizi
-        df = get_oanda_bars(ticker, granularity='M5', count=100)
-        if df.empty: return
+        df_m5 = get_oanda_bars(ticker, granularity='M5', count=100)
+        if df_m5.empty: return
         
-        df = find_turtle_soup(df)
+        # PIYASA REJIMI TESPITI (V4 PHASE 1)
+        regime, er = detect_market_regime(df_m5)
+        min_threshold = 75
+        if regime == "TRENDING": 
+            min_threshold = 55
+            print(f"📈 [TREND] {ticker} - Efficiency: {er:.2f} (Target: {min_threshold})")
+        elif regime == "CHOPPY": 
+            min_threshold = 85
+            print(f"📉 [CHOP] {ticker} - Efficiency: {er:.2f} (Target: {min_threshold})")
+        elif regime == "VOLATILE":
+            min_threshold = 95
+            print(f"⚠️ [VOLATILE] {ticker} - Be Careful (Target: {min_threshold})")
+            
+        df = find_turtle_soup(df_m5)
         df = find_fvg_v3(df)
         df = find_ifvg(df)
         df = find_inducement(df)
@@ -178,10 +192,18 @@ def trading_routine(ticker):
         
         # Decision Logic
         direction = "HOLD"
-        if score >= 70: direction = "LONG"
-        elif score <= -70: direction = "SHORT"
+        if score >= min_threshold: direction = "LONG"
+        elif score <= -min_threshold: direction = "SHORT"
         
+        # LOG ATTEMPT (V4 PHASE 2)
         if direction != "HOLD":
+            attempt_data = {
+                'ticker': ticker, 'direction': direction, 'score': score, 
+                'reasons': reasons, 'regime': regime, 'er': er, 
+                'status': 'SIGNAL_DETECTED', 'price': last['Close']
+            }
+            log_ict_attempt(attempt_data)
+            
             signal = {"ticker": ticker, "direction": direction, "score": score, "reasons": reasons}
             if openai_expert_approve(signal):
                 # Execution with Risk Management (1:3 RR)
@@ -189,7 +211,15 @@ def trading_routine(ticker):
                 dist = 0.0015 # 15 pips baseline
                 sl = price - dist if direction == "LONG" else price + dist
                 tp = price + (dist * 3.0) if direction == "LONG" else price - (dist * 3.0)
+                
+                # UPDATE LOG STATUS
+                attempt_data['status'] = 'EXECUTED'
+                log_ict_attempt(attempt_data)
+                
                 execute_market_order(ticker, 1000, direction, sl=sl, tp=tp)
+            else:
+                attempt_data['status'] = 'AI_REJECTED'
+                log_ict_attempt(attempt_data)
                 
     except Exception as e:
         print(f"Error in {ticker} routine: {e}")

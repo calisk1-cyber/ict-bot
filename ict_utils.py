@@ -94,3 +94,28 @@ def download_full_history(ticker, interval='5m', period='3d'):
         data.columns = [c[0] if isinstance(c, tuple) else c for c in data.columns]
         return data
     except: return pd.DataFrame()
+
+def detect_market_regime(df, lookback=24):
+    """
+    Piyasa durumunu analiz eder: TRENDING, CHOPPY, VOLATILE
+    """
+    df = df.copy()
+    # 1. Volatilite (ATR)
+    atr = ta.atr(df['High'], df['Low'], df['Close'], length=lookback)
+    avg_atr = atr.mean()
+    curr_atr = atr.iloc[-1]
+    
+    # 2. Efficiency Ratio (ER) - Ne kadar düz gidiyor?
+    change = (df['Close'] - df['Close'].shift(lookback)).abs()
+    volatility = (df['Close'] - df['Close'].shift(1)).abs().rolling(lookback).sum()
+    er = change / volatility
+    curr_er = er.iloc[-1]
+    
+    if curr_atr > (avg_atr * 1.5):
+        return "VOLATILE", curr_er
+    elif curr_er > 0.6:
+        return "TRENDING", curr_er
+    elif curr_er < 0.3:
+        return "CHOPPY", curr_er
+    else:
+        return "NORMAL", curr_er

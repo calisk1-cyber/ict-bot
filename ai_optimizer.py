@@ -6,43 +6,54 @@ from datetime import datetime
 
 # Config
 LOG_FILE = "ict_trade_history.csv"
+KNOWLEDGE_FILE = "ict_knowledge_base.json"
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 client = OpenAI(api_key=OPENAI_API_KEY)
 
 def run_daily_optimization():
-    print("🧠 AI Strateji Optimizasyonu Başlatılıyor...")
+    print("🧠 AI Strateji Denetimi ve Öğrenme Süreci Başlatılıyor...")
     
     if not os.path.exists(LOG_FILE):
         print("❌ Hata: İşlem geçmişi bulunamadı.")
         return
 
-    # 1. Veriyi Oku (Son 30 kayıt)
+    # 1. Verileri Oku
     try:
-        df = pd.read_csv(LOG_FILE)
-        last_trades = df.tail(30).to_string()
+        df_history = pd.read_csv(LOG_FILE).tail(20)
+        kb_data = {}
+        if os.path.exists(KNOWLEDGE_FILE):
+            with open(KNOWLEDGE_FILE, 'r') as f:
+                kb_data = json.load(f)
+        
+        # Sadece son snapshotları özetle
+        kb_summary = {k: v[-5:] for k, v in kb_data.items()}
     except Exception as e:
         print(f"❌ Veri okuma hatası: {e}")
         return
 
-    # 2. OpenAI Analizi
+    # 2. OpenAI Analizi (Deep Learning Audit)
     prompt = f"""
-    Aşağıda ICT Trading Bot'unun son 30 işlem denemesi (sinyalleri ve sonuçları) yer almaktadır:
+    Aşağıda ICT Bot'unun son işlemleri ve bu işlemler anındaki teknik hafıza (Market Snapshots) yer almaktadır:
     
-    {last_trades}
+    İŞLEM GEÇMİŞİ:
+    {df_history.to_string()}
     
-    ANALİZ İSTEĞİ:
-    1. Hangi rejimde (TRENDING/CHOPPY) bot daha başarılı?
-    2. Hangi pariteler (ticker) daha çok 'AI_REJECTED' alıyor? Neden?
-    3. Yarın için 'min_threshold' (skor eşiği) veya 'risk' ayarlarında bir değişiklik önerir misin?
+    TEKNİK HAFIZA (SNAPSHOTS):
+    {json.dumps(kb_summary, indent=2)}
     
-    Lütfen profesyonel bir fon yöneticisi gibi Türkçe özet ve teknik tavsiyeler ver.
+    STRATEJİK DENETİM İSTEĞİ:
+    1. Geçmiş işlemlerdeki ortak hata paternlerini bul (Örn: "Düşük Efficiency Ratio'da hep stop olunmuş").
+    2. Mevcut puanlama ağırlıklarını (Silver Bullet, FVG, SMT vb.) optimize etmek için yeni değerler öner.
+    3. Hangi rejimlerde (CHOP/TREND) botun 'IQ'su düşüyor?
+    
+    Lütfen teknik bir rapor ver ve STRATEGY_WEIGHTS sözlüğü için JSON formatında yeni önerilerini ekle.
     """
 
     try:
         response = client.chat.completions.create(
             model="gpt-4o",
             messages=[
-                {"role": "system", "content": "Sen dünyanın en kıdemli ICT stratejistisin. Görevin bot verilerini analiz edip karlılığı artırmaktır."},
+                {"role": "system", "content": "Sen dünyanın en gelişmiş algoritmik ICT denetçisisin. Verilerden öğrenip sistemi optimize edersin."},
                 {"role": "user", "content": prompt}
             ]
         )

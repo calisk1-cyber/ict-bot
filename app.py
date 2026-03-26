@@ -19,6 +19,7 @@ from ict_utils import (
 )
 from news_utils import is_news_volatile
 from trade_logger import log_ict_attempt
+from knowledge_manager import save_market_snapshot
 
 # --- 1. CONFIGURATION & ENV ---
 base_dir = os.path.dirname(os.path.abspath(__file__))
@@ -38,6 +39,16 @@ SYMBOLS = [
 client = OpenAI(api_key=OPENAI_API_KEY)
 oanda_api = API(access_token=OANDA_API_KEY, environment=OANDA_ENV)
 NEWS_TRADING_MODE = True
+
+# Dinamik Strateji Agirliklari (V6 PHASE 2)
+# Bu degerler ileride ai_optimizer.py tarafindan otomatik güncellenebilir
+STRATEGY_WEIGHTS = {
+    "silver_bullet": 30,
+    "macro": 20,
+    "turtle_soup": 25,
+    "fvg": 20,
+    "ifvg": 15
+}
 
 # --- 2. OANDA EXECUTION ENGINE ---
 def get_oanda_bars(symbol, granularity='M5', count=100):
@@ -264,17 +275,32 @@ def trading_routine(ticker):
         score = 0
         reasons = []
         
-        # Scoring Confluences
-        if is_silver_bullet_zone(now_utc): score += 30; reasons.append("Silver Bullet Window")
-        elif is_macro_time(now_utc): score += 20; reasons.append("Macro Time Window")
+        # Scoring Confluences (V6 DYNAMIC WEIGHTS)
+        if is_silver_bullet_zone(now_utc): 
+            score += STRATEGY_WEIGHTS["silver_bullet"]; reasons.append("Silver Bullet Window")
+        elif is_macro_time(now_utc): 
+            score += STRATEGY_WEIGHTS["macro"]; reasons.append("Macro Time Window")
         
-        if last['TurtleSoup_Bull']: score += 25; reasons.append("Liquidity Sweep (Bull)")
-        elif last['TurtleSoup_Bear']: score -= 25; reasons.append("Liquidity Sweep (Bear)")
+        if last['TurtleSoup_Bull']: 
+            score += STRATEGY_WEIGHTS["turtle_soup"]; reasons.append("Liquidity Sweep (Bull)")
+        elif last['TurtleSoup_Bear']: 
+            score -= STRATEGY_WEIGHTS["turtle_soup"]; reasons.append("Liquidity Sweep (Bear)")
         
-        if last['FVG_Bull']: score += 20; reasons.append("FVG Positive Displacement")
-        elif last['FVG_Bear']: score -= 20; reasons.append("FVG Negative Displacement")
+        if last['FVG_Bull']: 
+            score += STRATEGY_WEIGHTS["fvg"]; reasons.append("FVG Positive Displacement")
+        elif last['FVG_Bear']: 
+            score -= STRATEGY_WEIGHTS["fvg"]; reasons.append("FVG Negative Displacement")
         
-        if last.get('IFVG_Bull'): score += 15; reasons.append("Inversion FVG Confirmed")
+        if last.get('IFVG_Bull'): 
+            score += STRATEGY_WEIGHTS["ifvg"]; reasons.append("Inversion FVG Confirmed")
+        
+        # MARKET SNAPSHOT (V6 PHASE 1)
+        if direction != "HOLD" or score > 40:
+            snapshot_data = {
+                "score": score, "regime": regime, "er": er, 
+                "bias": htf_bias, "reasons": reasons
+            }
+            save_market_snapshot(ticker, snapshot_data)
         
         # Decision Logic (V5 Bias Filter)
         direction = "HOLD"

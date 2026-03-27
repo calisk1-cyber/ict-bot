@@ -6,7 +6,12 @@ from datetime import timedelta
 
 # Path setup
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-from ict_utils import find_turtle_soup, find_fvg_v3, is_silver_bullet_zone
+
+if os.getenv("STAGING") == "1":
+    print("--- [STAGING] LOADING EXPERIMENTAL UTILS ---")
+    from ict_utils_experimental import find_turtle_soup, find_fvg_v3, is_silver_bullet_zone
+else:
+    from ict_utils import find_turtle_soup, find_fvg_v3, is_silver_bullet_zone
 
 class UnifiedICTBacktest:
     def __init__(self, csv_path, spread_pips=1.5):

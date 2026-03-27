@@ -8,14 +8,14 @@ LOG_FILE = "ict_trade_history.csv"
 def log_ict_attempt(data):
     """
     Sinyal denemelerini ve sonuçlarını loglar.
-    Data keys: ticker, direction, score, reasons, regime, er, status, price
+    Data keys: ticker, direction, score, reasons, regime, er, status, price, sl, tp, pnl, ai_decision, red_flags
     """
     file_exists = os.path.isfile(LOG_FILE)
     
     with open(LOG_FILE, mode='a', newline='', encoding='utf-8') as f:
         writer = csv.DictWriter(f, fieldnames=[
-            'timestamp', 'ticker', 'direction', 'score', 
-            'reasons', 'regime', 'efficiency_ratio', 'status', 'price'
+            'timestamp', 'ticker', 'direction', 'signal_type', 'score', 
+            'entry_price', 'sl', 'tp', 'status', 'pnl', 'ai_decision', 'red_flags'
         ])
         
         if not file_exists:
@@ -25,12 +25,15 @@ def log_ict_attempt(data):
             'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             'ticker': data.get('ticker'),
             'direction': data.get('direction'),
+            'signal_type': "|".join(data.get('reasons', []))[:50],
             'score': data.get('score'),
-            'reasons': "|".join(data.get('reasons', [])),
-            'regime': data.get('regime'),
-            'efficiency_ratio': f"{data.get('er', 0):.4f}",
+            'entry_price': f"{data.get('price', 0):.5f}",
+            'sl': f"{data.get('sl', 0):.5f}",
+            'tp': f"{data.get('tp', 0):.5f}",
             'status': data.get('status'),
-            'price': f"{data.get('price', 0):.5f}"
+            'pnl': f"{data.get('pnl', 0):.2f}",
+            'ai_decision': data.get('ai_decision', 'PENDING'),
+            'red_flags': data.get('red_flags', 'NONE')
         }
         writer.writerow(row)
 

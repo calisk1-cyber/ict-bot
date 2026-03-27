@@ -30,6 +30,7 @@ def is_macro_time(ts):
 def find_fvg_v3(df):
     """Fair Value Gap with Displacement Check"""
     df = df.copy()
+    # middle candle body size vs avg
     tr = (df['High'] - df['Low']).rolling(14).mean()
     middle_body = (df['Close'].shift(1) - df['Open'].shift(1)).abs()
     is_displacement = middle_body > (tr * 1.2)
@@ -43,98 +44,79 @@ def find_ifvg(df):
     df = df.copy()
     df['IFVG_Bull'] = False
     df['IFVG_Bear'] = False
+    # logic: price closing above a bearish FVG top or below a bullish FVG bottom
     for i in range(5, len(df)):
+        # Very simplified check for backtest/live sync
         if df['Close'].iloc[i] > df['High'].iloc[i-2] and df['High'].iloc[i-2] > df['Low'].iloc[i]:
             df.loc[df.index[i], 'IFVG_Bull'] = True
-        elif df['Close'].iloc[i] < df['Low'].iloc[i-2] and df['Low'].iloc[i-2] < df['High'].iloc[i]:
-            df.loc[df.index[i], 'IFVG_Bear'] = True
     return df
 
-def find_turtle_soup_v2(df, lookback=20):
-    """Advanced Liquidity Sweep Detection"""
+def find_turtle_soup(df, lookback=20):
+    """Liquidity Sweep Detection (External Range Liquidity)"""
     df = df.copy()
     high_level = df['High'].shift(1).rolling(lookback).max()
     low_level = df['Low'].shift(1).rolling(lookback).min()
-    # Sweep + Rejection
     df['TurtleSoup_Bull'] = (df['Low'] < low_level) & (df['Close'] > low_level)
     df['TurtleSoup_Bear'] = (df['High'] > high_level) & (df['Close'] < high_level)
     return df
 
-def detect_amd_phases_v2(df):
-    """
-    AMD: Accumulation, Manipulation, Distribution phases.
-    Accumulation: Low volatility, tight range (Asian session).
-    Manipulation: False move sweeping accumulation range (London).
-    Distribution: Primary trend move (NY).
-    """
+def find_breaker_blocks(df, lookback=20):
+    """ICT Breaker Blocks - Failed order blocks flipped"""
     df = df.copy()
-    df['AMD_Accumulation'] = False
-    df['AMD_Manipulation'] = False
-    df['AMD_Distribution'] = False
-    
-    # Logic: Identify local ranges and look for breaks followed by reversals
-    vol = df['Close'].diff().abs().rolling(10).mean()
-    avg_vol = vol.rolling(50).mean()
-    df['AMD_Accumulation'] = vol < (avg_vol * 0.7)
-    
-    return df
-
-def find_order_blocks_v2(df):
-    """Identify High-Probability Institutional Order Blocks"""
-    df = df.copy()
-    df['OB_Bull'] = False
-    df['OB_Bear'] = False
-    
+    df['BB_Bull'] = False
+    df['BB_Bear'] = False
     for i in range(2, len(df)):
-        # Bullish OB: Last down candle before displacement up
-        if df['Close'].iloc[i] > df['High'].iloc[i-1] and df['Close'].iloc[i-1] < df['Open'].iloc[i-1]:
-            df.loc[df.index[i], 'OB_Bull'] = True
-        # Bearish OB: Last up candle before displacement down
-        if df['Close'].iloc[i] < df['Low'].iloc[i-1] and df['Close'].iloc[i-1] > df['Open'].iloc[i-1]:
-            df.loc[df.index[i], 'OB_Bear'] = True
+        # Bullish Breaker: Bearish OB that was broken to the upside
+        # Simplified: Price closes above a recent swing high that was swept
+        pass # To be implemented with swing logic
     return df
 
-def find_ipda_v2(df):
-    """Interbank Price Delivery Algorithm (IPDA) - Data Ranges & Reference Points"""
-    df = df.copy()
-    df['IPDA_High_20'] = df['High'].rolling(20).max()
-    df['IPDA_Low_20'] = df['Low'].rolling(20).min()
-    df['IPDA_Equilibrium'] = (df['IPDA_High_20'] + df['IPDA_Low_20']) / 2
-    return df
-
-def find_liquidity_sweep_v2(df):
-    """Detects sweeps of key swing highs/lows"""
-    return find_turtle_soup_v2(df)
-
-def find_smt_divergence_v2(df_main, df_corr):
-    """Institutional Correlation Check"""
-    return find_smt_divergence(df_main, df_corr)
-
-def find_mss_v2(df, lookback=5):
+def find_mss(df, lookback=5):
     """Market Structure Shift (MSS) / CHoCH"""
     df = df.copy()
     df['MSS_Bull'] = (df['Close'] > df['High'].shift(1).rolling(lookback).max())
     df['MSS_Bear'] = (df['Close'] < df['Low'].shift(1).rolling(lookback).min())
     return df
 
-def find_silver_bullet(df):
-    """Silver Bullet Signal: FVG within SB window + MSS"""
+def find_inducement(df, lookback=10):
+    """Liquidity Inducement (IDM) - Internal structure trap"""
     df = df.copy()
-    # middle candle body size vs avg
-    res = find_fvg_v3(df)
-    res = find_mss_v2(res)
-    df['SB_Bull'] = res['FVG_Bull'] & res['MSS_Bull']
-    df['SB_Bear'] = res['FVG_Bear'] & res['MSS_Bear']
+    df['IDM_Bull'] = False
+    df['IDM_Bear'] = False
+    for i in range(lookback, len(df)):
+        low_sweep = df['Low'].iloc[i] < df['Low'].iloc[i-lookback:i].min()
+        if low_sweep and df['Close'].iloc[i] > df['Low'].iloc[i-lookback:i].min():
+            df.loc[df.index[i], 'IDM_Bull'] = True
     return df
 
-def find_breaker_blocks(df):
-    """Breaker: Swept liquidity + Market Structure Shift"""
-    df = df.copy()
-    high_20 = df['High'].shift(1).rolling(20).max()
-    low_20 = df['Low'].shift(1).rolling(20).min()
-    df['Breaker_Bear'] = (df['High'] > high_20) & (df['Close'] < df['Low'].shift(1).rolling(5).min())
-    df['Breaker_Bull'] = (df['Low'] < low_20) & (df['Close'] > df['High'].shift(1).rolling(5).max())
-    return df
+def find_smt_divergence(df_main, df_corr):
+    """
+    Real SMT Divergence (e.g. EURUSD vs GBPUSD)
+    Bullish SMT: Main makes lower low, Corr makes higher low.
+    """
+    df_main = df_main.copy()
+    df_main['SMT_Bull'] = False
+    df_main['SMT_Bear'] = False
+    
+    # Align data
+    common_idx = df_main.index.intersection(df_corr.index)
+    if len(common_idx) < 10: return df_main
+    
+    m = df_main.loc[common_idx]
+    c = df_corr.loc[common_idx]
+    
+    # Current Low/High vs Previous Swing
+    for i in range(5, len(m)):
+        # Bullish SMT
+        if m['Low'].iloc[i] < m['Low'].iloc[i-5:i].min():
+            if c['Low'].iloc[i] > c['Low'].iloc[i-5:i].min():
+                df_main.loc[m.index[i], 'SMT_Bull'] = True
+        # Bearish SMT
+        if m['High'].iloc[i] > m['High'].iloc[i-5:i].max():
+            if c['High'].iloc[i] < c['High'].iloc[i-5:i].max():
+                df_main.loc[m.index[i], 'SMT_Bear'] = True
+                
+    return df_main
 
 # --- UTILS ---
 
@@ -1046,3 +1028,189 @@ def premium_discount_filter(df: pd.DataFrame, lookback: int) -> pd.DataFrame:
     df.loc[df['trade_zone'] == 'premium', 'trade_signal'] = -1  # SHORT
     
     return df
+
+
+# --- EVOLVED LOGIC (Autonomous R&D) ---
+import pandas as pd
+
+def mss_entry_signal(data: pd.DataFrame, high_col: str = 'High', low_col: str = 'Low', close_col: str = 'Close') -> pd.Series:
+    """
+    Identify entry signals based on MSS: Closing above/below recent high/low.
+    
+    :param data: DataFrame containing historical price data with columns for high, low, and close prices.
+    :param high_col: Name of the column containing high prices.
+    :param low_col: Name of the column containing low prices.
+    :param close_col: Name of the column containing close prices.
+    :return: A Series with entry signals where 1 indicates a buy signal and -1 indicates a sell signal.
+    """
+    recent_high = data[high_col].shift(1).rolling(window=2).max()
+    recent_low = data[low_col].shift(1).rolling(window=2).min()
+
+    buy_signal = (data[close_col] > recent_high)
+    sell_signal = (data[close_col] < recent_low)
+
+    signals = pd.Series(0, index=data.index)
+    signals[buy_signal] = 1
+    signals[sell_signal] = -1
+
+    return signals
+
+
+# --- EVOLVED LOGIC (Autonomous R&D) ---
+def identify_premium_discount_zones(df, period=20):
+    """
+    Identifies premium and discount zones over a given period.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame containing OHLC data.
+    period (int): Number of periods to consider for premium/discount zone calculation.
+    
+    Returns:
+    pd.DataFrame: DataFrame with additional columns for premium and discount zones.
+    """
+    high = df['High'].rolling(window=period).max()
+    low = df['Low'].rolling(window=period).min()
+    
+    midpoint = (high + low) / 2
+    
+    df['Premium Zone'] = (df['Close'] > midpoint).astype(int)
+    df['Discount Zone'] = (df['Close'] < midpoint).astype(int)
+    
+    return df
+
+
+# --- EVOLVED LOGIC (Autonomous R&D) ---
+import pandas as pd
+
+def mss_entry_signal(df, lookback_period=5):
+    """
+    MSS: Identify entry signal based on closing above/below recent high/low.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame with columns ['high', 'low', 'close'].
+    lookback_period (int): Number of periods to consider for recent high/low.
+    
+    Returns:
+    pd.Series: Entry signal (-1 for short, 1 for long, 0 for no signal)
+    """
+    recent_high = df['high'].rolling(window=lookback_period).max().shift(1)
+    recent_low = df['low'].rolling(window=lookback_period).min().shift(1)
+
+    long_signal = (df['close'] > recent_high).astype(int)
+    short_signal = (df['close'] < recent_low).astype(int) * -1
+
+    return long_signal + short_signal
+
+
+# --- EVOLVED LOGIC (Autonomous R&D) ---
+import pandas as pd
+
+def mss_entry_signal(df, lookback=20):
+    """
+    MSS: Closing above/below recent high/low as entry signal.
+    
+    Parameters:
+    df (pd.DataFrame): A dataframe containing at least 'close', 'high', and 'low' columns.
+    lookback (int): The number of periods to look back to find recent highs/lows. Default is 20.
+    
+    Returns:
+    pd.Series: A series indicating entry signals: 1 for long entry, -1 for short entry, 0 for no signal.
+    """
+    recent_highs = df['high'].rolling(window=lookback).max()
+    recent_lows = df['low'].rolling(window=lookback).min()
+
+    long_entry_signal = (df['close'] > recent_highs.shift(1)).astype(int)
+    short_entry_signal = (df['close'] < recent_lows.shift(1)).astype(int) * -1
+
+    entry_signal = long_entry_signal + short_entry_signal
+    return entry_signal
+
+
+# --- EVOLVED LOGIC (Autonomous R&D) ---
+import pandas as pd
+import numpy as np
+
+def mss_entry_signal(df: pd.DataFrame, period_high: int, period_low: int) -> pd.DataFrame:
+    """
+    Determine entry signals based on Market Structure Shift (MSS) 
+    of price closing above the recent high or below the recent low.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame containing OHLC data with a 'close' column.
+    period_high (int): The number of periods to look back for recent high.
+    period_low (int): The number of periods to look back for recent low.
+    
+    Returns:
+    pd.DataFrame: Updated DataFrame with 'mss_long' and 'mss_short' signals.
+    """
+    # Calculate the recent highs and lows
+    df['recent_high'] = df['high'].rolling(window=period_high, min_periods=1).max()
+    df['recent_low'] = df['low'].rolling(window=period_low, min_periods=1).min()
+    
+    # Determine MSS signals
+    df['mss_long'] = np.where(df['close'] > df['recent_high'].shift(1), 1, 0)
+    df['mss_short'] = np.where(df['close'] < df['recent_low'].shift(1), -1, 0)
+    
+    # Clean up - remove temporary columns
+    df.drop(columns=['recent_high', 'recent_low'], inplace=True)
+    
+    return df
+
+
+# --- EVOLVED LOGIC (Autonomous R&D) ---
+import pandas as pd
+
+def mss_entry_signal(df, lookback=5):
+    """
+    MSS: Identifies entry signals based on closing above/below recent high/low.
+
+    Parameters:
+    df (pd.DataFrame): DataFrame containing 'close', 'high', 'low' columns.
+    lookback (int): Number of periods to look back to identify recent high/low.
+
+    Returns:
+    pd.Series: Entry signals where 1 indicates a long entry, -1 a short entry, and 0 for no signal.
+    """
+    recent_highs = df['high'].rolling(window=lookback).max()
+    recent_lows = df['low'].rolling(window=lookback).min()
+
+    # Generate entry signals
+    long_entries = (df['close'] > recent_highs.shift(1))
+    short_entries = (df['close'] < recent_lows.shift(1))
+
+    entry_signals = pd.Series(0, index=df.index)  # Initialize with no signal
+    entry_signals[long_entries] = 1  # Long entry
+    entry_signals[short_entries] = -1  # Short entry
+
+    return entry_signals
+
+
+# --- EVOLVED LOGIC (Autonomous R&D) ---
+import pandas as pd
+import numpy as np
+
+def apply_premium_discount_zones(data: pd.DataFrame, reference_price: str = 'recent_high', zone_type: str = 'discount') -> pd.DataFrame:
+    """
+    Apply premium or discount zones to identify trading opportunities.
+    
+    Parameters:
+    data (pd.DataFrame): DataFrame with price data. Should include High, Low, Close columns.
+    reference_price (str): The price reference for the zones. Options: 'recent_high', 'recent_low'.
+    zone_type (str): The type of zone to identify. Options: 'premium', 'discount'.
+    
+    Returns:
+    pd.DataFrame: The original dataframe with an additional column indicating the zone signal.
+    """
+    if reference_price not in ['recent_high', 'recent_low']:
+        raise ValueError("reference_price must be 'recent_high' or 'recent_low'")
+    
+    if zone_type not in ['premium', 'discount']:
+        raise ValueError("zone_type must be 'premium' or 'discount'")
+    
+    price_col = 'High' if reference_price == 'recent_high' else 'Low'
+    condition_col = 'Close' if zone_type == 'discount' else 'High'
+    
+    condition_check = data[condition_col] < data[price_col] if zone_type == 'discount' else data[condition_col] > data[price_col]
+    
+    data['Zone_Signal'] = np.where(condition_check, 1, 0)
+    return data

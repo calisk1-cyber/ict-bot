@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ICT Singularity | R&D Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0a0b10;
+            --card-bg: #151921;
+            --accent: #00f2ff;
+            --text: #e0e0e0;
+            --win: #00ff88;
+            --loss: #ff4d4d;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            padding: 20px;
+            overflow-x: hidden;
+        }
+
+        h1 {
+            font-family: 'Orbitron', sans-serif;
+            color: var(--accent);
+            text-align: center;
+            text-transform: uppercase;
+            letter-spacing: 4px;
+            margin-bottom: 40px;
+            text-shadow: 0 0 15px rgba(0, 242, 255, 0.5);
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 25px;
+        }
+
+        .experiment-card {
+            background: var(--card-bg);
+            border: 1px solid rgba(0, 242, 255, 0.1);
+            border-radius: 12px;
+            padding: 20px;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .experiment-card:hover {
+            transform: translateY(-5px);
+            border-color: var(--accent);
+            box-shadow: 0 10px 30px rgba(0, 242, 255, 0.1);
+        }
+
+        .timestamp {
+            font-size: 0.8rem;
+            color: #888;
+            margin-bottom: 10px;
+        }
+
+        .performance {
+            display: flex;
+            justify-content: space-between;
+            margin: 15px 0;
+            padding-bottom: 15px;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .perf-item {
+            text-align: center;
+        }
+
+        .perf-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            font-family: 'Orbitron', sans-serif;
+        }
+
+        .win-rate { color: var(--win); }
+        .net-profit { color: var(--accent); }
+
+        .analysis-box {
+            background: rgba(0,0,0,0.3);
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            line-height: 1.5;
+            max-height: 200px;
+            overflow-y: auto;
+            color: #bbb;
+        }
+
+        .knowledge-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 15px;
+        }
+
+        .tag {
+            background: rgba(0, 242, 255, 0.1);
+            color: var(--accent);
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            border: 1px solid rgba(0, 242, 255, 0.2);
+        }
+
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-thumb { background: var(--accent); border-radius: 10px; }
+
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>ICT Singularity <span style="font-size: 0.5em; vertical-align: middle;">R&D DASHBOARD</span></h1>
+        
+        <div id="loading" style="text-align: center; color: var(--accent);">
+            Synthesizing Neural Data...
+        </div>
+
+        <div id="experiments" class="stats-grid">
+            <!-- Experiments filled by JS -->
+        </div>
+    </div>
+
+    <script>
+        async function fetchExperiments() {
+            try {
+                const response = await fetch('/api/experiments');
+                const data = await response.json();
+                const container = document.getElementById('experiments');
+                document.getElementById('loading').style.display = 'none';
+                
+                container.innerHTML = data.reverse().map(exp => `
+                    <div class="experiment-card">
+                        <div class="timestamp">${new Date(exp.timestamp).toLocaleString()}</div>
+                        <div class="performance">
+                            <div class="perf-item">
+                                <div style="font-size: 0.7rem; color: #888;">WIN RATE</div>
+                                <div class="perf-value win-rate">${exp.performance.win_rate}%</div>
+                            </div>
+                            <div class="perf-item">
+                                <div style="font-size: 0.7rem; color: #888;">RETURN</div>
+                                <div class="perf-value net-profit">${exp.performance.return > 0 ? '+' : ''}${exp.performance.return}</div>
+                            </div>
+                        </div>
+                        <div class="analysis-box">
+                            <strong>AI AUDIT:</strong><br>
+                            ${exp.analysis.replace(/\n/g, '<br>')}
+                        </div>
+                        <div class="knowledge-tags">
+                            ${exp.knowledge.map(k => `<span class="tag">${k}</span>`).join('')}
+                        </div>
+                    </div>
+                `).join('');
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        fetchExperiments();
+        setInterval(fetchExperiments, 60000); // Reload every min
+    </script>
+</body>
+</html>

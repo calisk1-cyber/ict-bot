@@ -64,5 +64,27 @@
             "Premium/Discount Zones: Only trade in discount for longs.",
             "Daily Open Cross: London open vs Daily open relationship."
         ]
+    },
+    {
+        "timestamp": "2026-03-27T13:41:32.275963",
+        "performance": {}
+    },
+    {
+        "timestamp": "2026-03-27T13:42:45.350599",
+        "status": "SUCCESS",
+        "performance": {
+            "win_rate": 5.88235294117647,
+            "net_pnl": -1243.632067811146,
+            "max_dd": 20.00319171954331,
+            "sharpe": -11.51106290183821,
+            "total_trades": 34
+        },
+        "params": {
+            "fvg": 25,
+            "turtle_soup": 20,
+            "ifvg": 22,
+            "sb": 20,
+            "macro": 18
+        }
     }
 ]

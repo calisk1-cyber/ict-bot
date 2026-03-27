@@ -86,11 +86,11 @@ class ProfessionalBacktesterV8:
             if row.get('TurtleSoup_Bull'): score += w.get('turtle_soup', 25)
             if is_sb: score += w.get('sb', 30)
             
-            # Use 30 for testing sensitive signals
-            if score >= 30 and row['BIAS'] != "BEARISH":
+            # Reverted to 50 (Institutional Gold Standard)
+            if score >= 50 and row['BIAS'] != "BEARISH":
                 self.open_trade(ticker, 'LONG', row, ts, pip_size, score)
                 active_trade = self.trades[-1]
-            elif score <= -30 and row['BIAS'] != "BULLISH": # Multi-directional support
+            elif score <= -50 and row['BIAS'] != "BULLISH": 
                 self.open_trade(ticker, 'SHORT', row, ts, pip_size, score)
                 active_trade = self.trades[-1]
 

@@ -106,13 +106,19 @@
         async function runBacktest() {
             const btn = document.querySelector('.btn');
             const resultsBox = document.getElementById('bt-results');
+            const period = document.getElementById('bt-period').value;
+            
+            if (period === '7g') {
+                if (!confirm('7 günlük veri çok az olabilir, 30 gün önerilir. Yine de devam edilsin mi?')) return;
+            }
+            
             btn.innerText = 'RUNNING...';
-            resultsBox.innerHTML = '<p>Processing 500 potential trades across 3 pairs...</p>';
+            resultsBox.innerHTML = '<p>Processing 500 potential trades across 3 pairs (Threshold: 50)...</p>';
             
             try {
                 const r = await fetch('/backtest', { 
                     method: 'POST', 
-                    body: JSON.stringify({ ticker: document.getElementById('bt-ticker').value }), 
+                    body: JSON.stringify({ ticker: document.getElementById('bt-ticker').value, period: period }), 
                     headers: {'Content-Type': 'application/json'} 
                 });
                 const data = await r.json();
@@ -129,11 +135,13 @@
                             <p>Sharpe: ${p.sharpe.toFixed(2)}</p>
                         </div>
                     `;
+                } else if (data.status === "NO_TRADES" || data.status === "NO_CLOSED_TRADES") {
+                    resultsBox.innerHTML = `<p style="color: var(--danger)">Veri yetersiz veya kriterlere uygun işlem bulunamadı. Lütfen daha uzun bir periyot (30g+) seçin.</p>`;
                 } else {
-                    resultsBox.innerHTML = `<p style="color: var(--danger)">No trades triggered with current filters. Status: ${data.status}</p>`;
+                    resultsBox.innerHTML = `<p style="color: var(--danger)">Hata: ${data.status}</p>`;
                 }
             } catch (e) {
-                resultsBox.innerHTML = `<p style="color: var(--danger)">Error connecting to backtest engine.</p>`;
+                resultsBox.innerHTML = `<p style="color: var(--danger)">Sunucu bağlantı hatası.</p>`;
             } finally {
                 btn.innerText = 'START BACKTEST';
             }

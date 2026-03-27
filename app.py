@@ -1,4 +1,5 @@
 import os
+import sys
 import json
 import asyncio
 import threading
@@ -66,7 +67,7 @@ def run_backtest_api():
         import subprocess
         print(f"--- RUNNING BACKTEST FOR {ticker} ---")
         # Run and wait for completion
-        result = subprocess.run(["py", "realistic_backtest_v8.py"], capture_output=True, text=True, timeout=60)
+        result = subprocess.run([sys.executable, "realistic_backtest_v8.py"], capture_output=True, text=True, timeout=60)
         
         if result.returncode != 0:
             return jsonify({"status": "ERROR", "message": f"Script failed: {result.stderr[:200]}"})

@@ -60,16 +60,26 @@ def api_live():
 
 @app.route('/backtest', methods=['POST'])
 def run_backtest_api():
-    data = request.json
+    data = request.json or {}
     ticker = data.get('ticker', 'EUR_USD')
-    # Triggering backtest script
     try:
         import subprocess
-        subprocess.run(["py", "realistic_backtest_v8.py"], capture_output=True)
-        with open("backtest_experiments.json", "r") as f:
-            res = json.load(f)[-1]
-        return jsonify(res)
-    except: return jsonify({"error": "Backtest failed"})
+        print(f"--- RUNNING BACKTEST FOR {ticker} ---")
+        # Run and wait for completion
+        result = subprocess.run(["py", "realistic_backtest_v8.py"], capture_output=True, text=True, timeout=60)
+        
+        if result.returncode != 0:
+            return jsonify({"status": "ERROR", "message": f"Script failed: {result.stderr[:200]}"})
+            
+        if os.path.exists("backtest_experiments.json"):
+            with open("backtest_experiments.json", "r") as f:
+                exps = json.load(f)
+                if exps:
+                    return jsonify(exps[-1])
+        
+        return jsonify({"status": "ERROR", "message": "No results in experiments file"})
+    except Exception as e:
+        return jsonify({"status": "ERROR", "message": str(e)})
 
 def run_flask():
     app.run(host='0.0.0.0', port=5000, debug=False, use_reloader=False)

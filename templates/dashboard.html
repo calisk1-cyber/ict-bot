@@ -138,7 +138,8 @@
                 } else if (data.status === "NO_TRADES" || data.status === "NO_CLOSED_TRADES") {
                     resultsBox.innerHTML = `<p style="color: var(--danger)">Veri yetersiz veya kriterlere uygun işlem bulunamadı. Lütfen daha uzun bir periyot (30g+) seçin.</p>`;
                 } else {
-                    resultsBox.innerHTML = `<p style="color: var(--danger)">Hata: ${data.status}</p>`;
+                    const msg = data.message || data.error || data.status || 'Bilinmeyen Hata';
+                    resultsBox.innerHTML = `<p style="color: var(--danger)">Hata: ${msg}</p>`;
                 }
             } catch (e) {
                 resultsBox.innerHTML = `<p style="color: var(--danger)">Sunucu bağlantı hatası.</p>`;

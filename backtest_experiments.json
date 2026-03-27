@@ -98,5 +98,71 @@
             "sb": 20,
             "macro": 18
         }
+    },
+    {
+        "timestamp": "2026-03-27T18:41:27.643624",
+        "status": "NO_TRADES",
+        "performance": {},
+        "params": {
+            "fvg": 25,
+            "turtle_soup": 20,
+            "ifvg": 22,
+            "sb": 20,
+            "macro": 18
+        }
+    },
+    {
+        "timestamp": "2026-03-27T18:42:26.224468",
+        "status": "SUCCESS",
+        "performance": {
+            "win_rate": 7.894736842105263,
+            "net_pnl": -1206.3346250768573,
+            "max_dd": 22.0488393800168,
+            "sharpe": -9.659824499284268,
+            "total_trades": 38
+        },
+        "params": {
+            "fvg": 25,
+            "turtle_soup": 20,
+            "ifvg": 22,
+            "sb": 20,
+            "macro": 18
+        }
+    },
+    {
+        "timestamp": "2026-03-27T18:42:51.759229",
+        "status": "SUCCESS",
+        "performance": {
+            "win_rate": 17.5,
+            "net_pnl": -333.7301753594711,
+            "max_dd": 16.62714822223097,
+            "sharpe": -5.862047039420686,
+            "total_trades": 40
+        },
+        "params": {
+            "fvg": 25,
+            "turtle_soup": 20,
+            "ifvg": 22,
+            "sb": 20,
+            "macro": 18
+        }
+    },
+    {
+        "timestamp": "2026-03-27T18:46:04.009130",
+        "status": "SUCCESS",
+        "performance": {
+            "win_rate": 33.33333333333333,
+            "net_pnl": 248.97500000000036,
+            "max_dd": 1.0198000295521787,
+            "sharpe": 2.4240431132188522,
+            "total_trades": 3
+        },
+        "params": {
+            "fvg": 25,
+            "turtle_soup": 20,
+            "ifvg": 22,
+            "sb": 20,
+            "macro": 18
+        }
     }
 ]

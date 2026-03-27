@@ -78,30 +78,54 @@ class ProfessionalBacktesterV8:
                         active_trade['partial'] = True
                 continue
 
-            # Signal
-            is_sb = (ts.hour in [7, 14, 18])
+            # Signal Score Calculation
             w = self.weights
             score = 0
-            if row.get('FVG_Bull'): score += w.get('fvg', 20)
-            if row.get('TurtleSoup_Bull'): score += w.get('turtle_soup', 25)
-            if is_sb: score += w.get('sb', 30)
+            if row.get('FVG_Bull'): score += w.get('fvg', 25)
+            if row.get('TurtleSoup_Bull'): score += w.get('turtle_soup', 20)
+            if row.get('IFVG_Bull'): score += w.get('ifvg', 22)
             
-            # Reverted to 50 (Institutional Gold Standard)
-            if score >= 50 and row['BIAS'] != "BEARISH":
+            if row.get('FVG_Bear'): score -= w.get('fvg', 25)
+            if row.get('TurtleSoup_Bear'): score -= w.get('turtle_soup', 20)
+            if row.get('IFVG_Bear'): score -= w.get('ifvg', 22)
+
+            # Pure ICT Filters: Kill Zones & PD Arrays
+            is_kill_zone = (ts.hour in [7, 8, 9, 13, 14, 15, 18, 19])
+            
+            # Premium/Discount check (Dealing Range of last 50 bars)
+            low_50 = df_5m['Low'].iloc[i-50:i].min()
+            high_50 = df_5m['High'].iloc[i-50:i].max()
+            midpoint = (low_50 + high_50) / 2
+            is_discount = row['Close'] < midpoint
+            is_premium = row['Close'] > midpoint
+            
+            # Adjusted to 30 for performance audit (Pure ICT) + Time/Space Filters
+            if score >= 30 and row['BIAS'] == "BULLISH" and is_kill_zone and is_discount:
                 self.open_trade(ticker, 'LONG', row, ts, pip_size, score)
                 active_trade = self.trades[-1]
-            elif score <= -50 and row['BIAS'] != "BULLISH": 
+            elif score <= -30 and row['BIAS'] == "BEARISH" and is_kill_zone and is_premium: 
                 self.open_trade(ticker, 'SHORT', row, ts, pip_size, score)
                 active_trade = self.trades[-1]
 
     def open_trade(self, ticker, direction, row, ts, pip_size, score):
-        atr = row.get('ATR', 0.0010)
-        sl_dist = atr * 2
-        if sl_dist == 0: sl_dist = 0.0015
+        # SMC/ICT Style: Stop loss at the low/high of the signal candle or the FVG pattern candle
+        # For simplicity in this backtest, we use a structural offset based on the candles
+        # If no specific structural info, fallback to a safe distance
+        
         entry = row['Close']
-        sl = entry - sl_dist if direction == 'LONG' else entry + sl_dist
-        tp = entry + (sl_dist * 5) if direction == 'LONG' else entry - (sl_dist * 5)
+        if direction == 'LONG':
+            # SL below the recent 3-candle low (FVG area)
+            sl = row['Low'] * 0.9995 # ~5-10 pips below
+        else:
+            # SL above the recent 3-candle high
+            sl = row['High'] * 1.0005
+            
+        sl_dist = abs(entry - sl)
+        if sl_dist < 0.0005: sl_dist = 0.0015 # Minimum safe distance
+        
+        tp = entry + (sl_dist * 3) if direction == 'LONG' else entry - (sl_dist * 3) # 1:3 RR is more realistic
         units = (self.balance * 0.01) / sl_dist
+        
         self.trades.append({
             'ticker': ticker, 'dir': direction, 'entry': entry, 'sl': sl, 'sl_orig': sl, 'tp': tp, 
             'units': units, 'partial': False, 'status': 'OPEN', 'time': ts, 'score': score, 'pnl': 0

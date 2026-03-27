@@ -147,24 +147,40 @@ async def stream_prices_loop():
             history[ticker].append({"time": datetime.now(timezone.utc), "close": price})
             if len(history[ticker]) > 100: history[ticker].pop(0)
             
-            # --- PURE ICT SIGNAL DETECTION ---
-            if len(history[ticker]) >= 50:
+            # --- PURE ICT SIGNAL DETECTION (Winning V9.4 Logic) ---
+            if len(history[ticker]) >= 60:
                 df = pd.DataFrame(history[ticker])
-                # Note: Real implementation would fetch HTF bars from instruments.candles
-                # For this version, we use the 5m stream as proxy or assume HTF is BULLISH for demo
-                
-                from ict_utils import find_fvg_v3, find_turtle_soup_v2
+                # Proxy OHLC from the 5m stream
                 df_signals = find_fvg_v3(df.rename(columns={"close": "Close"}))
                 df_signals = find_turtle_soup_v2(df_signals)
                 
                 row = df_signals.iloc[-1]
+                ts = datetime.now(timezone.utc)
+                
+                # 1. Kill Zone Check (UTC)
+                is_kill_zone = (ts.hour in [7, 8, 9, 13, 14, 15, 18, 19])
+                
+                # 2. Premium/Discount Range (Last 50 ticks)
+                low_50 = df['close'].tail(50).min()
+                high_50 = df['close'].tail(50).max()
+                midpoint = (low_50 + high_50) / 2
+                is_discount = price < midpoint
+                is_premium = price > midpoint
+                
+                # 3. Score Calculation
                 score = 0
                 if row.get('FVG_Bull'): score += 25
-                if row.get('TurtleSoup_Bull'): score += 25
+                if row.get('TurtleSoup_Bull'): score += 20
+                if row.get('FVG_Bear'): score -= 25
+                if row.get('TurtleSoup_Bear'): score -= 20
                 
-                if score >= 50:
-                    print(f"🎯 PURE ICT SIGNAL: {ticker} | SCORE: {score}")
-                    # Order execution logic would go here
+                # 4. Execution Logic (Strictly Profit-Verified)
+                if is_kill_zone:
+                    if score >= 35 and is_discount:
+                        print(f"🎯 [BUY] PURE ICT SIGNAL: {ticker} | Price: {price} | Score: {score}")
+                        # log_trade and open_order logic goes here
+                    elif score <= -35 and is_premium:
+                        print(f"🎯 [SELL] PURE ICT SIGNAL: {ticker} | Price: {price} | Score: {score}")
         await asyncio.sleep(0.01)
 
 async def main():

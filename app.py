@@ -63,10 +63,41 @@ def api_live():
 def run_backtest_api():
     data = request.json or {}
     ticker = data.get('ticker', 'EUR_USD')
+    period = data.get('period', '30g')
+    
+    # DEBUG PRINTS AS REQUESTED
+    print(f"\n--- [DEBUG] STARTING BACKTEST ANALYSIS ---")
+    print(f"Ticker: {ticker}")
+    print(f"Periyot: {period}")
+    
     try:
+        # Step 1: Data Check (Using yfinance to simulate bars for debug)
+        import yfinance as yf
+        yf_map = {"EUR_USD": "EURUSD=X", "XAU_USD": "GC=F", "NAS100_USD": "^NDX"}
+        yf_ticker = yf_map.get(ticker, ticker.replace("_", "") + "=X")
+        
+        # Download data explicitly for debug
+        df = yf.download(yf_ticker, period="1mo", interval="5m", progress=False)
+        print(f"Çekilen veri: {len(df)} bar")
+        
+        if len(df) < 100:
+            print("HATA: Çekilen veri çok az!")
+            return jsonify({"status": "ERROR", "message": f"Veri yetersiz: {len(df)} bar bulundu."})
+
+        # Step 2: Signal Check (Preliminary check for debug)
+        df.columns = [c[0] if isinstance(c, tuple) else c for c in df.columns]
+        from ict_utils import find_fvg_v3, find_turtle_soup_v2
+        df = find_fvg_v3(df)
+        df = find_turtle_soup_v2(df)
+        
+        bull_signals = df[df['FVG_Bull'] | df['TurtleSoup_Bull']]
+        print(f"Bulunan toplam ham sinyal: {len(bull_signals)}")
+        
+        # We don't filter bias here just for the log
+        print(f"--- [DEBUG] END ANALYSIS ---\n")
+
+        # Run the actual backtest script
         import subprocess
-        print(f"--- RUNNING BACKTEST FOR {ticker} ---")
-        # Run and wait for completion
         result = subprocess.run([sys.executable, "realistic_backtest_v8.py"], capture_output=True, text=True, timeout=60)
         
         if result.returncode != 0:
@@ -80,6 +111,7 @@ def run_backtest_api():
         
         return jsonify({"status": "ERROR", "message": "No results in experiments file"})
     except Exception as e:
+        print(f"Backtest Error: {e}")
         return jsonify({"status": "ERROR", "message": str(e)})
 
 def run_flask():

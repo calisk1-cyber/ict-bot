@@ -1,4 +1,5 @@
 import os
+import sys
 import time
 import subprocess
 import threading
@@ -42,7 +43,7 @@ def slow_validation_loop():
             walk_forward_optimize()
             
             # Regular KPI Check logic...
-            subprocess.run(["py", "realistic_backtest_v8.py"], env={**os.environ, "STAGING": "1"})
+            subprocess.run([sys.executable, "realistic_backtest_v8.py"], env={**os.environ, "STAGING": "1"})
             
             time.sleep(3600)
         except Exception as e:

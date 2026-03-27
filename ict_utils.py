@@ -198,32 +198,35 @@ def calculate_pvr_risk(df, base_units=2000):
         
     return int(base_units * scalar)
 
-def get_htf_bias(ticker):
+def get_smc_bias(df_htf):
     """
-    4H ve 1D grafiklerde ana yönü tayin eder.
-    Döner: 'BULLISH', 'BEARISH', 'NEUTRAL'
+    SMC/Pure ICT Bias: Determines the institutional order flow.
+    Uses Market Structure Shift (MSS) and PD Array (Premium/Discount).
     """
-    try:
-        # 1. 4H Verisini Çek
-        df_4h = download_full_history(ticker, interval='1h', period='7d') # 4H yerine 1H kümülatif bakabiliriz
-        if df_4h.empty: return "NEUTRAL"
-        
-        # Basit EMA ve RSI Filtresi
-        ema_20 = ta.ema(df_4h['Close'], length=20)
-        rsi = ta.rsi(df_4h['Close'], length=14)
-        
-        last_price = df_4h['Close'].iloc[-1]
-        last_ema = ema_20.iloc[-1]
-        last_rsi = rsi.iloc[-1]
-        
-        if last_price > last_ema and last_rsi > 50:
-            return "BULLISH"
-        elif last_price < last_ema and last_rsi < 50:
-            return "BEARISH"
-        else:
-            return "NEUTRAL"
-    except:
+    if df_htf.empty or len(df_htf) < 20: return "NEUTRAL"
+    
+    df = df_htf.copy()
+    # 1. Market Structure Shift (MSS) using Swing Highs/Lows
+    high_20 = df['High'].rolling(20).max()
+    low_20 = df['Low'].rolling(20).min()
+    
+    last_close = float(df['Close'].iloc[-1])
+    current_midpoint = float((high_20.iloc[-1] + low_20.iloc[-1]) / 2)
+    
+    # Simple Bias: If close is above midpoint of the 20-period range
+    if last_close > current_midpoint:
+        return "BULLISH"
+    elif last_close < current_midpoint:
+        return "BEARISH"
+    else:
         return "NEUTRAL"
+
+def is_in_discount(df_range, current_price):
+    """Buy only in discount (lower 50%), sell only in premium (upper 50%)"""
+    high = df_range['High'].max()
+    low = df_range['Low'].min()
+    midpoint = (high + low) / 2
+    return current_price < midpoint
 
 def save_chart_image(df, ticker, direction, score):
     """

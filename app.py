@@ -119,7 +119,7 @@ def run_backtest_api():
                     # If empty results but we found signals in debug, explain why
                     if not res.get("performance") and len(filtered) > 0:
                         res["status"] = "NO_TRADES"
-                        res["message"] = "Sinyal var ama Bias (EMA200) uymadığı için işlem açılmadı."
+                        res["message"] = "Sinyal var ama SMC Bias uymadığı için işlem açılmadı."
                     return jsonify(res)
         
         return jsonify({"status": "NO_TRADES", "message": "Kriterlere uygun işlem bulunamadı."})
@@ -136,10 +136,35 @@ async def stream_prices_loop():
     r = pricing.PricingStream(accountID=OANDA_ACCOUNT_ID, params={"instruments": ",".join(SYMBOLS)})
     def _gen(): return oanda_api.request(r)
     print("--- LIVE STREAM ACTIVE ---")
+    
+    # Store recent prices for signal calculation
+    history = {s: [] for s in SYMBOLS}
+    
     for msg in _gen():
         if msg.get('type') == 'PRICE':
-            # Signal processing logic...
-            pass
+            ticker = msg['instrument']
+            price = float(msg['bids'][0]['price'])
+            history[ticker].append({"time": datetime.now(timezone.utc), "close": price})
+            if len(history[ticker]) > 100: history[ticker].pop(0)
+            
+            # --- PURE ICT SIGNAL DETECTION ---
+            if len(history[ticker]) >= 50:
+                df = pd.DataFrame(history[ticker])
+                # Note: Real implementation would fetch HTF bars from instruments.candles
+                # For this version, we use the 5m stream as proxy or assume HTF is BULLISH for demo
+                
+                from ict_utils import find_fvg_v3, find_turtle_soup_v2
+                df_signals = find_fvg_v3(df.rename(columns={"close": "Close"}))
+                df_signals = find_turtle_soup_v2(df_signals)
+                
+                row = df_signals.iloc[-1]
+                score = 0
+                if row.get('FVG_Bull'): score += 25
+                if row.get('TurtleSoup_Bull'): score += 25
+                
+                if score >= 50:
+                    print(f"🎯 PURE ICT SIGNAL: {ticker} | SCORE: {score}")
+                    # Order execution logic would go here
         await asyncio.sleep(0.01)
 
 async def main():

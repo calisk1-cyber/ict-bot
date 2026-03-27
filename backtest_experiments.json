@@ -86,5 +86,17 @@
             "sb": 20,
             "macro": 18
         }
+    },
+    {
+        "timestamp": "2026-03-27T15:19:26.148042",
+        "status": "NO_TRADES",
+        "performance": {},
+        "params": {
+            "fvg": 25,
+            "turtle_soup": 20,
+            "ifvg": 22,
+            "sb": 20,
+            "macro": 18
+        }
     }
 ]

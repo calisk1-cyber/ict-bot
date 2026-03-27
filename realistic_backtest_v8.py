@@ -36,11 +36,11 @@ class ProfessionalBacktesterV8:
         df_1h = pd.read_csv(file_1h, index_col=0, parse_dates=True)
         pip_size = self.get_pip_value(ticker)
 
-        # Bias
-        df_1h['EMA20'] = ta.ema(df_1h['Close'], length=20)
-        df_1h['BIAS'] = "NEUTRAL"
-        df_1h.loc[df_1h['Close'] > df_1h['EMA20'], 'BIAS'] = "BULLISH"
-        df_1h.loc[df_1h['Close'] < df_1h['EMA20'], 'BIAS'] = "BEARISH"
+        # Pure ICT Bias (Using SMC Market Structure)
+        from ict_utils import get_smc_bias
+        
+        # Calculate bias on 1H timeframe
+        df_1h['BIAS'] = df_1h.apply(lambda x: get_smc_bias(df_1h.loc[:x.name].tail(20)), axis=1)
         df_5m = pd.merge_asof(df_5m.sort_index(), df_1h[['BIAS']].sort_index(), left_index=True, right_index=True)
 
         # Indicators (Staging check)

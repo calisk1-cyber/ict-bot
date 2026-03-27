@@ -89,9 +89,6 @@ class ProfessionalBacktesterV8:
             if row.get('TurtleSoup_Bear'): score -= w.get('turtle_soup', 20)
             if row.get('IFVG_Bear'): score -= w.get('ifvg', 22)
 
-            # Pure ICT Filters: Kill Zones & PD Arrays
-            is_kill_zone = (ts.hour in [7, 8, 9, 13, 14, 15, 18, 19])
-            
             # Premium/Discount check (Dealing Range of last 50 bars)
             low_50 = df_5m['Low'].iloc[i-50:i].min()
             high_50 = df_5m['High'].iloc[i-50:i].max()
@@ -99,11 +96,11 @@ class ProfessionalBacktesterV8:
             is_discount = row['Close'] < midpoint
             is_premium = row['Close'] > midpoint
             
-            # Adjusted to 30 for performance audit (Pure ICT) + Time/Space Filters
-            if score >= 30 and row['BIAS'] == "BULLISH" and is_kill_zone and is_discount:
+            # 24/7 ICT Logic (No Kill Zones)
+            if score >= 35 and row['BIAS'] == "BULLISH" and is_discount:
                 self.open_trade(ticker, 'LONG', row, ts, pip_size, score)
                 active_trade = self.trades[-1]
-            elif score <= -30 and row['BIAS'] == "BEARISH" and is_kill_zone and is_premium: 
+            elif score <= -35 and row['BIAS'] == "BEARISH" and is_premium: 
                 self.open_trade(ticker, 'SHORT', row, ts, pip_size, score)
                 active_trade = self.trades[-1]
 

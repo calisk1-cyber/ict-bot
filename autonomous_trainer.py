@@ -35,17 +35,38 @@ def walk_forward_optimize():
     
     print("--- WALK-FORWARD OPTIMIZATION COMPLETE ---")
 
+def apply_best_weights():
+    """Finds the best weights from experiments and updates live config."""
+    try:
+        if not os.path.exists(EXP_DATABASE): return
+        with open(EXP_DATABASE, "r") as f:
+            exps = json.load(f)
+        
+        # Filter successful ones and pick highest win rate
+        valid = [e for e in exps if e.get("status") == "SUCCESS"]
+        if not valid: return
+        
+        best = max(valid, key=lambda x: x["performance"].get("net_pnl", -9999))
+        
+        print(f"--- [LEARNING] Applying Best Weights (PnL: {best['performance']['net_pnl']}) ---")
+        with open("optimized_weights.json", "w") as f:
+            json.dump(best["params"], f, indent=4)
+            
+    except Exception as e:
+        print(f"Weight Error: {e}")
+
 def slow_validation_loop():
     print("--- [VALIDATION LOOP] PERPETUAL AUDIT STARTED ---")
     while True:
         try:
-            # Monthly walk-forward trigger should go here
-            walk_forward_optimize()
+            # 1. Run backtest audit on all pairs
+            subprocess.run([sys.executable, "realistic_backtest_v8.py"])
             
-            # Regular KPI Check logic...
-            subprocess.run([sys.executable, "realistic_backtest_v8.py"], env={**os.environ, "STAGING": "1"})
+            # 2. Pick best weights from this run
+            apply_best_weights()
             
-            time.sleep(3600)
+            print(f"--- [AUDIT] Cycle Complete at {datetime.now()} ---")
+            time.sleep(3600)  # Hourly update
         except Exception as e:
             print(f"Trainer Error: {e}")
             time.sleep(300)

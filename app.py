@@ -27,11 +27,12 @@ base_dir = os.path.dirname(os.path.abspath(__file__))
 load_dotenv(os.path.join(base_dir, ".env"), override=True)
 OANDA_API_KEY = os.getenv("OANDA_API_KEY")
 OANDA_ACCOUNT_ID = os.getenv("OANDA_ACCOUNT_ID")
+OANDA_ACCESS_TOKEN = os.getenv("OANDA_ACCESS_TOKEN")
 oanda_api = API(access_token=OANDA_API_KEY, environment=os.getenv("OANDA_ENV", "practice"))
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 risk_manager = DailyRiskManager(initial_balance=100000.0)
 
-SYMBOLS = ["EUR_USD", "XAU_USD", "NAS100_USD", "GBP_USD"]
+SYMBOLS = ["EUR_USD", "GBP_USD", "XAU_USD", "NAS100_USD", "USD_JPY", "AUD_USD", "USD_CAD", "EUR_JPY"]
 
 # --- FLASK APP ---
 app = Flask(__name__, template_folder='templates')
@@ -147,40 +148,34 @@ async def stream_prices_loop():
             history[ticker].append({"time": datetime.now(timezone.utc), "close": price})
             if len(history[ticker]) > 100: history[ticker].pop(0)
             
-            # --- PURE ICT SIGNAL DETECTION (Winning V9.4 Logic) ---
+            # --- PURE ICT SIGNAL DETECTION (V9.5: 24/7 Mode) ---
             if len(history[ticker]) >= 60:
                 df = pd.DataFrame(history[ticker])
-                # Proxy OHLC from the 5m stream
+                # Proxy OHLC from the 1m/tick stream
                 df_signals = find_fvg_v3(df.rename(columns={"close": "Close"}))
                 df_signals = find_turtle_soup_v2(df_signals)
                 
                 row = df_signals.iloc[-1]
-                ts = datetime.now(timezone.utc)
                 
-                # 1. Kill Zone Check (UTC)
-                is_kill_zone = (ts.hour in [7, 8, 9, 13, 14, 15, 18, 19])
-                
-                # 2. Premium/Discount Range (Last 50 ticks)
+                # 1. Premium/Discount Range (Last 50 ticks)
                 low_50 = df['close'].tail(50).min()
                 high_50 = df['close'].tail(50).max()
                 midpoint = (low_50 + high_50) / 2
                 is_discount = price < midpoint
                 is_premium = price > midpoint
                 
-                # 3. Score Calculation
+                # 2. Score Calculation
                 score = 0
                 if row.get('FVG_Bull'): score += 25
                 if row.get('TurtleSoup_Bull'): score += 20
                 if row.get('FVG_Bear'): score -= 25
                 if row.get('TurtleSoup_Bear'): score -= 20
                 
-                # 4. Execution Logic (Strictly Profit-Verified)
-                if is_kill_zone:
-                    if score >= 35 and is_discount:
-                        print(f"🎯 [BUY] PURE ICT SIGNAL: {ticker} | Price: {price} | Score: {score}")
-                        # log_trade and open_order logic goes here
-                    elif score <= -35 and is_premium:
-                        print(f"🎯 [SELL] PURE ICT SIGNAL: {ticker} | Price: {price} | Score: {score}")
+                # 3. Execution Logic (Strictly Profit-Verified, No Time Limit)
+                if score >= 35 and is_discount:
+                    print(f"🎯 [BUY] 24/7 ICT SIGNAL: {ticker} | Price: {price} | Score: {score}")
+                elif score <= -35 and is_premium:
+                    print(f"🎯 [SELL] 24/7 ICT SIGNAL: {ticker} | Price: {price} | Score: {score}")
         await asyncio.sleep(0.01)
 
 async def main():

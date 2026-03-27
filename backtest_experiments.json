@@ -164,5 +164,59 @@
             "sb": 20,
             "macro": 18
         }
+    },
+    {
+        "timestamp": "2026-03-27T19:17:57.450682",
+        "status": "SUCCESS",
+        "performance": {
+            "win_rate": 37.5,
+            "net_pnl": 659.0850506746701,
+            "max_dd": 2.0294020588088455,
+            "sharpe": 2.58378687480493,
+            "total_trades": 8
+        },
+        "params": {
+            "fvg": 25,
+            "turtle_soup": 20,
+            "ifvg": 22,
+            "sb": 20,
+            "macro": 18
+        }
+    },
+    {
+        "timestamp": "2026-03-27T19:19:32.898226",
+        "status": "SUCCESS",
+        "performance": {
+            "win_rate": 37.5,
+            "net_pnl": 659.0850506746701,
+            "max_dd": 2.0294020588088455,
+            "sharpe": 2.58378687480493,
+            "total_trades": 8
+        },
+        "params": {
+            "fvg": 25,
+            "turtle_soup": 20,
+            "ifvg": 22,
+            "sb": 20,
+            "macro": 18
+        }
+    },
+    {
+        "timestamp": "2026-03-27T19:19:50.547351",
+        "status": "SUCCESS",
+        "performance": {
+            "win_rate": 37.5,
+            "net_pnl": 659.0850506746701,
+            "max_dd": 2.0294020588088455,
+            "sharpe": 2.58378687480493,
+            "total_trades": 8
+        },
+        "params": {
+            "fvg": 25,
+            "turtle_soup": 20,
+            "ifvg": 22,
+            "sb": 20,
+            "macro": 18
+        }
     }
 ]

@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>ICT SINGULARITY V9.2 - Terminal</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root { --bg: #070b0f; --card: #0f1721; --accent: #00e5a0; --text: #e0e6ed; --danger: #ff4d4d; }
+        body { background: var(--bg); color: var(--text); font-family: 'JetBrains Mono', monospace; margin: 0; padding: 20px; }
+        .container { max-width: 1400px; margin: 0 auto; }
+        .nav { display: flex; gap: 20px; border-bottom: 1px solid #1e293b; padding-bottom: 10px; margin-bottom: 20px; }
+        .nav-item { color: #94a3b8; cursor: pointer; padding: 5px 10px; }
+        .nav-item.active { border-bottom: 2px solid var(--accent); color: var(--accent); }
+        .view { display: none; }
+        .view.active { display: block; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px; }
+        .card { background: var(--card); padding: 20px; border-radius: 8px; border: 1px solid #1e293b; }
+        .btn { background: var(--accent); color: var(--bg); border: none; padding: 10px 20px; cursor: pointer; border-radius: 4px; font-weight: bold; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #1e293b; }
+        th { color: #94a3b8; font-size: 12px; text-transform: uppercase; }
+        .status-dot { height: 10px; width: 10px; border-radius: 50%; display: inline-block; margin-right: 5px; }
+        .online { background: var(--accent); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="nav">
+            <div class="nav-item active" onclick="showView('main')">DASHBOARD</div>
+            <div class="nav-item" onclick="showView('live')">LIVE BOT</div>
+            <div class="nav-item" onclick="showView('backtest')">BACKTEST</div>
+            <div class="nav-item" onclick="showView('analytics')">ANALYTICS</div>
+        </div>
+
+        <!-- MAIN VIEW -->
+        <div id="main-view" class="view active">
+            <div class="stats-grid" id="main-stats"></div>
+            <div class="card"><canvas id="equityChart" height="80"></canvas></div>
+            <div class="card" style="margin-top:20px;">
+                <h3>Last 20 Trades</h3>
+                <table id="trades-table"><thead><tr><th>Time</th><th>Pair</th><th>Dir</th><th>Entry</th><th>PnL</th><th>Status</th></tr></thead><tbody id="trades-body"></tbody></table>
+            </div>
+        </div>
+
+        <!-- LIVE VIEW -->
+        <div id="live-view" class="view">
+            <div class="stats-grid">
+                <div class="card"><h3>Bot Status</h3><p><span class="status-dot online"></span> ONLINE</p></div>
+                <div class="card"><h3>Daily PnL</h3><p id="daily-pnl">$0.00</p></div>
+                <div class="card"><h3>Kill Zone</h3><p id="kz-status">-</p></div>
+            </div>
+            <div class="card"><h3>Open OANDA Positions</h3><table id="live-table"><thead><tr><th>ID</th><th>Instrument</th><th>Units</th><th>Price</th><th>Risk</th></tr></thead><tbody id="live-body"></tbody></table></div>
+        </div>
+
+        <!-- BACKTEST VIEW -->
+        <div id="backtest-view" class="view">
+            <div class="card">
+                <h3>Backtest Controller</h3>
+                <select id="bt-ticker"><option>EUR_USD</option><option>XAU_USD</option></select>
+                <select id="bt-period"><option>30g</option><option>90g</option></select>
+                <button class="btn" onclick="runBacktest()">START BACKTEST</button>
+                <div id="bt-results" style="margin-top:20px;"></div>
+            </div>
+        </div>
+
+        <!-- ANALYTICS VIEW -->
+        <div id="analytics-view" class="view">
+            <div class="stats-grid">
+                <div class="card"><canvas id="hourChart"></canvas></div>
+                <div class="card"><canvas id="pairChart"></canvas></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function showView(id) {
+            document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+            document.querySelectorAll('.nav-item').forEach(v => v.classList.remove('active'));
+            document.getElementById(id + '-view').classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        async function updateDashboard() {
+            const stats = await (await fetch('/api/stats')).json();
+            document.getElementById('main-stats').innerHTML = `
+                <div class="card"><h3>Net PnL</h3><p>$${stats.total_pnl.toFixed(2)}</p></div>
+                <div class="card"><h3>Win Rate</h3><p>${stats.win_rate.toFixed(1)}%</p></div>
+                <div class="card"><h3>Trades</h3><p>${stats.total_trades}</p></div>
+                <div class="card"><h3>Max DD</h3><p>${stats.max_dd.toFixed(1)}%</p></div>
+            `;
+            const trades = await (await fetch('/api/trades')).json();
+            document.getElementById('trades-body').innerHTML = trades.map(t => `
+                <tr><td>${t.timestamp}</td><td>${t.ticker}</td><td>${t.direction}</td><td>${t.entry_price.toFixed(5)}</td><td style="color:${t.pnl>=0?'var(--accent)':'var(--danger)'}">$${t.pnl.toFixed(2)}</td><td>${t.status}</td></tr>
+            `).join('');
+        }
+
+        async function updateLive() {
+            const live = await (await fetch('/api/live')).json();
+            document.getElementById('kz-status').innerText = live.kill_zone ? 'ACTIVE' : 'INACTIVE';
+            document.getElementById('live-body').innerHTML = live.positions.map(p => `
+                <tr><td>${p.id}</td><td>${p.instrument}</td><td>${p.currentUnits}</td><td>${p.price}</td><td>Active</td></tr>
+            `).join('');
+        }
+
+        async function runBacktest() {
+            const results = await (await fetch('/backtest', { method: 'POST', body: JSON.stringify({ ticker: 'EUR_USD' }), headers: {'Content-Type': 'application/json'} })).json();
+            document.getElementById('bt-results').innerText = JSON.stringify(results.performance, null, 2);
+        }
+
+        setInterval(updateDashboard, 5000);
+        setInterval(updateLive, 10000);
+        updateDashboard();
+    </script>
+</body>
+</html>

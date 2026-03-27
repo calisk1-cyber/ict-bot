@@ -77,5 +77,33 @@ def update_trade_closure(trade_id, exit_price, pnl):
     conn.commit()
     conn.close()
 
+def get_recent_trades(limit=20):
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM trades ORDER BY timestamp DESC LIMIT ?", (limit,))
+    rows = [dict(row) for row in cursor.fetchall()]
+    conn.close()
+    return rows
+
+def get_trade_stats():
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    # PnL & Win Rate
+    cursor.execute("SELECT COUNT(pnl), SUM(pnl), COUNT(CASE WHEN pnl > 0 THEN 1 END) FROM trades WHERE status='CLOSED'")
+    total, net_pnl, wins = cursor.fetchone()
+    total = total or 0; net_pnl = net_pnl or 0; wins = wins or 0
+    wr = (wins / total * 100) if total > 0 else 0
+    
+    # Live Positions
+    cursor.execute("SELECT COUNT(*) FROM trades WHERE status='OPEN'")
+    live_pos = cursor.fetchone()[0]
+    
+    conn.close()
+    return {
+        "total_pnl": float(net_pnl), "win_rate": float(wr), "total_trades": int(total),
+        "max_dd": 0.0, "sharpe": 0.0, "live_pos": int(live_pos)
+    }
+
 if __name__ == "__main__":
     init_database()

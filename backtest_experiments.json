@@ -218,5 +218,89 @@
             "sb": 20,
             "macro": 18
         }
+    },
+    {
+        "timestamp": "2026-03-27T19:23:14.419499",
+        "status": "SUCCESS",
+        "performance": {
+            "win_rate": 23.52941176470588,
+            "net_pnl": 704.9313678071139,
+            "max_dd": 5.611862602204685,
+            "sharpe": -1.9773957721071629,
+            "total_trades": 17
+        },
+        "params": {
+            "fvg": 25,
+            "turtle_soup": 20,
+            "ifvg": 22,
+            "sb": 20,
+            "macro": 18
+        }
+    },
+    {
+        "timestamp": "2026-03-27T19:23:50.968246",
+        "status": "NO_TRADES",
+        "performance": {},
+        "params": {
+            "fvg": 25,
+            "turtle_soup": 20,
+            "ifvg": 22,
+            "sb": 20,
+            "macro": 18
+        }
+    },
+    {
+        "timestamp": "2026-03-27T19:27:43.071090",
+        "status": "SUCCESS",
+        "performance": {
+            "win_rate": 25.925925925925924,
+            "net_pnl": 178.72531714327306,
+            "max_dd": 15.855306341375574,
+            "sharpe": 0.1947863506264241,
+            "total_trades": 81
+        },
+        "params": {
+            "fvg": 25,
+            "turtle_soup": 20,
+            "ifvg": 22,
+            "sb": 20,
+            "macro": 18
+        }
+    },
+    {
+        "timestamp": "2026-03-27T19:30:19.784790",
+        "status": "SUCCESS",
+        "performance": {
+            "win_rate": 25.925925925925924,
+            "net_pnl": 178.72531714327306,
+            "max_dd": 15.855306341375574,
+            "sharpe": 0.1947863506264241,
+            "total_trades": 81
+        },
+        "params": {
+            "fvg": 25,
+            "turtle_soup": 20,
+            "ifvg": 22,
+            "sb": 20,
+            "macro": 18
+        }
+    },
+    {
+        "timestamp": "2026-03-27T19:32:47.233695",
+        "status": "SUCCESS",
+        "performance": {
+            "win_rate": 25.688073394495415,
+            "net_pnl": 347.0451204669753,
+            "max_dd": 20.50771391490795,
+            "sharpe": 0.1352987742345798,
+            "total_trades": 218
+        },
+        "params": {
+            "fvg": 25,
+            "turtle_soup": 20,
+            "ifvg": 22,
+            "sb": 20,
+            "macro": 18
+        }
     }
 ]

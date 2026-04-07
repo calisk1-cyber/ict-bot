@@ -15,13 +15,15 @@ class Bot2Hunter(BaseAgent):
     def search_github(self, query: str):
         """Searches GitHub for potential trading strategies."""
         self.logger.info(f"Searching GitHub for: {query}")
-        url = f"https://api.github.com/search/repositories?q={query}&sort=stars&order=desc"
+        import random
+        page = random.randint(1, 10) # Rastgele 1 ile 10. sayfa arası (derinlemesine arama)
+        url = f"https://api.github.com/search/repositories?q={query}&sort=stars&order=desc&per_page=10&page={page}"
         headers = {"Authorization": f"token {self.github_token}"} if self.github_token else {}
         
         try:
             response = requests.get(url, headers=headers)
             if response.status_code == 200:
-                items = response.json().get("items", [])[:5]
+                items = response.json().get("items", [])
                 return [item['html_url'] for item in items]
         except Exception as e:
             self.logger.error(f"GitHub Search Error: {e}")
@@ -41,7 +43,9 @@ class Bot2Hunter(BaseAgent):
         self.logger.info("Searching ArXiv for new Q-Fin papers...")
         import urllib.request
         import xml.etree.ElementTree as ET
-        url = "http://export.arxiv.org/api/query?search_query=cat:q-fin.TR&sortBy=submittedDate&sortOrder=descending&max_results=3"
+        import random
+        start_index = random.randint(0, 50) # Son 50 makale içinden rastgele 5'ini çek (derinlemesine)
+        url = f"http://export.arxiv.org/api/query?search_query=cat:q-fin.TR&sortBy=submittedDate&sortOrder=descending&start={start_index}&max_results=5"
         papers = []
         try:
             response = urllib.request.urlopen(url)
@@ -116,17 +120,22 @@ class Bot2Hunter(BaseAgent):
 
     def find_new_strategies(self):
         """Main loop for finding new strategies through Multi-Source Hunting (Github, ArXiv, TradingView, MQL)."""
+        import time
+        import random
         # 1. GITHUB HUNTING
-        github_queries = ["PineScript trading strategy", "MQL5 EA expert advisor", "forex order flow python"]
-        for query in github_queries:
+        github_queries = ["PineScript trading strategy", "MQL5 EA expert advisor", "forex order flow python",
+                          "mean reversion algorithmic trading", "crypto grid bot python", "ICT forex github"]
+        random.shuffle(github_queries) # Her döngüde aramaları karıştır
+        
+        for query in github_queries[:3]: # Her seferinde farklı 3 konsepti ara ki API limitine takılmayalım
             urls = self.search_github(query)
             for url in urls:
                 if self.is_processed("github_repos", url): continue
-                # We determine type by query to feed different context
                 stype = "pinescript" if "PineScript" in query else "mql5" if "MQL5" in query else "github"
                 mock_content = f"Scraped code from {url} focusing on {query}." # Placeholder for real scraping
                 strat_json = self.extract_logic_with_llm(mock_content, source_type=stype)
                 self._save_and_push_strategy(strat_json, url, "github_repos")
+                time.sleep(random.uniform(5, 10)) # API limitlerine saygı ve okuma süresi (bot taklidi)
 
         # 2. ARXIV HUNTING
         arxiv_papers = self.search_arxiv()
@@ -135,6 +144,7 @@ class Bot2Hunter(BaseAgent):
             content = f"Title: {paper['title']}\nAbstract: {paper['summary']}"
             strat_json = self.extract_logic_with_llm(content, source_type="arxiv")
             self._save_and_push_strategy(strat_json, paper['link'], "arxiv_papers")
+            time.sleep(random.uniform(5, 10)) # AI makaleyi okuyor (sindirme süresi)
 
     def _save_and_push_strategy(self, strat_json, source_link, category_key):
         if not strat_json or strat_json.get("confidence_score", 0) <= 0.5:

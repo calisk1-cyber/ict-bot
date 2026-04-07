@@ -141,11 +141,25 @@ class ProfessionalBacktesterV8:
     def close_trade(self, trade, price, ts, status):
         trade['status'] = status
         u = trade['units'] * 0.5 if trade['partial'] else trade['units']
+        
+        # --- INSTITUTIONAL AUDIT: SPREAD & COMMISSION ---
+        # 1. Spread Deduction (approx 0.7 pips per trade)
+        spread_cost = 0.00007 * u if "JPY" not in trade['ticker'] else 0.007 * u
+        if "XAU" in trade['ticker']: spread_cost = 0.20 * trade['units'] # $20 per 100oz (typical)
+        
+        # 2. Commission (approx $7 per 1.0 lot / 100k units round-turn)
+        commission = (u / 100000) * 7.0
+        
+        # Raw PnL
         pnl = (price - trade['entry']) * u if trade['dir'] == 'LONG' else (trade['entry'] - price) * u
-        trade['pnl'] += pnl
+        
+        # Final Net PnL after costs
+        net_trade_pnl = pnl - spread_cost - commission
+        
+        trade['pnl'] = net_trade_pnl
         trade['exit_price'] = price
         trade['exit_time'] = ts
-        self.balance += pnl
+        self.balance += net_trade_pnl
 
     def calculate_metrics(self):
         if not self.trades: return {"status": "NO_TRADES", "performance": {}}

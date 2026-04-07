@@ -80,6 +80,19 @@ module.exports = {
       env: {
         PORT: 3000
       }
+    },
+    {
+      name: "bot5-analyst",
+      script: "bot5_analyst.py",
+      interpreter: "python3",
+      cwd: "/root",
+      env_file: "/root/.env",
+      out_file: "/root/logs/bot5-out.log",
+      error_file: "/root/logs/bot5-err.log",
+      autorestart: true,
+      restart_delay: 15000,
+      max_restarts: 20,
+      watch: false
     }
   ]
 };

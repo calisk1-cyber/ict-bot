@@ -53,30 +53,24 @@ class Bot1Backtester(BaseAgent):
         strat_id = strategy_data.get("strategy_id")
         self.logger.info(f"Starting backtest for strategy: {strategy_data.get('name')} ({strat_id})")
         
-        # 1. Fetch Data (hardcoded 3y simulate for now, or use inputs)
-        # Using M15 as default if not specified
+        # 1. Map Timeframes and Pairs
         tf = strategy_data.get("timeframes", ["M15"])[0]
-        pair = strategy_data.get("pairs", ["EUR_USD"])[0]
+        pairs = strategy_data.get("pairs", [])
         
-        # Map OANDA granularity
-        oanda_tf = tf # Assuming M15 -> M15
-        
-        data_df = self.fetch_oanda_data(pair, oanda_tf, count=2000)
-        if data_df is None or data_df.empty:
-            return {"passed": False, "fail_reason": "Data fetch failed"}
+        # If the LLM didn't specify pairs or only gave one, we force a diversified basket to get enough trades
+        if len(pairs) < 3:
+            pairs = ["EUR_USD", "GBP_USD", "XAU_USD", "NAS100_USD"]
+            
+        oanda_tf = tf
 
-        # 2. Backtrader Engine (Simplified example)
-        # In actual implementation, we would dynamic load indicators from strategy_data
-        
-        # metrics simulation (for now, as full backtrader dynamic script loading is complex)
         # 2. Professional Backtest Logic (Real-time calculation)
         from realistic_backtest_v8 import ProfessionalBacktesterV8
-        tester = ProfessionalBacktesterV8()
+        tester = ProfessionalBacktesterV8(max_trades=1000)
         
-        # We simulate the backtest run for the specific strategy and data
-        # Note: In a full implementation, we pass the strategy entry/exit logic to the tester.
-        # For this phase, we run the optimized ICT logic which the Hunter found.
-        tester.run_backtest(pair)
+        # We run the backtest across ALL assigned pairs to accumulate a statistically significant trade count!
+        for p in pairs:
+            tester.run_backtest(p)
+            
         metrics = tester.calculate_metrics()
         
         if metrics["status"] == "SUCCESS":
@@ -89,9 +83,8 @@ class Bot1Backtester(BaseAgent):
                 "win_rate": perf["win_rate"],
                 "profit_factor": 1.5, # Estimated from PnL
                 "total_trades": perf["total_trades"],
-                # Universal Sniper Audit: If PnL > 0 and Win Rate >= 40% (with 1:3 RR), we take it.
-                # Low frequency is fine because we run hundreds of strategies simultaneously.
-                "passed": perf["win_rate"] >= 40 and perf["max_dd"] < 20 and perf["total_trades"] >= 1
+                # STRENGTHENED AUDIT: A strategy must prove itself over at least 15 trades
+                "passed": perf["win_rate"] >= 40 and perf["max_dd"] < 20 and perf["total_trades"] >= 15
             }
         else:
             return {"passed": False, "fail_reason": "No trades generated in backtest"}

@@ -6,11 +6,16 @@ import json
 from datetime import datetime
 
 class ProfessionalBacktesterV8:
-    def __init__(self, initial_balance=10000.0, max_trades=500):
-        self.balance = initial_balance
+    def __init__(self, initial_balance=10000, max_trades=1000, use_analyst=False):
         self.initial_balance = initial_balance
-        self.trades = []
+        self.balance = float(initial_balance)
         self.max_trades = max_trades
+        self.use_analyst = use_analyst
+        self.trades = []
+        self.daily_pnls = []
+        self.current_drawdown = 0.0
+        self.high_water_mark = float(initial_balance)
+        self.total_fees_saved = 0
         self.weights = {"fvg": 20, "turtle_soup": 25, "ifvg": 15, "sb": 30, "macro": 20}
         
         if os.path.exists("optimized_weights.json"):
@@ -103,35 +108,49 @@ class ProfessionalBacktesterV8:
                 
             rsi = df_5m['RSI'].iloc[i]
             
+            # --- BOT 5 ANALYST SIMULATION ---
+            # 1. Dynamic Spread Watchdog (ATR-based volatility simulation)
+            if 'ATR' not in df_5m.columns:
+                df_5m['ATR'] = ta.atr(df_5m['High'], df_5m['Low'], df_5m['Close'], length=14)
+            
+            atr = df_5m['ATR'].iloc[i]
+            avg_atr = df_5m['ATR'].rolling(50).mean().iloc[i] or atr
+            is_high_vol = atr > (avg_atr * 1.5)
+            
+            # Bot 5 skips high spread/volatility periods
+            if self.use_analyst and is_high_vol:
+                self.total_fees_saved += 1 # Metric placeholder
+                continue 
+
+            # 2. Dynamic Risk Scaling
+            risk_val = 1.0
+            if self.use_analyst and self.current_drawdown > 0.10: 
+                risk_val = 0.25 # Scale down to 1/4 risk during DD
+            
             # 24/7 Scalper Logic (Aggressive Mode)
             # Threshold: 20 (Reduced from 35)
             # Conditions: Score + RSI Overbought/Oversold + HTF Bias
             if score >= 20 and row.get('BIAS') == "BULLISH" and rsi < 60:
-                self.open_trade(ticker, 'LONG', row, ts, pip_size, score)
+                self.open_trade(ticker, 'LONG', row, ts, pip_size, score, risk_val)
                 active_trade = self.trades[-1]
             elif score <= -20 and row.get('BIAS') == "BEARISH" and rsi > 40: 
-                self.open_trade(ticker, 'SHORT', row, ts, pip_size, score)
+                self.open_trade(ticker, 'SHORT', row, ts, pip_size, score, risk_val)
                 active_trade = self.trades[-1]
 
-    def open_trade(self, ticker, direction, row, ts, pip_size, score):
-        # SMC/ICT Style: Stop loss at the low/high of the signal candle or the FVG pattern candle
-        # For simplicity in this backtest, we use a structural offset based on the candles
-        # If no specific structural info, fallback to a safe distance
-        
+    def open_trade(self, ticker, direction, row, ts, pip_size, score, risk_val=1.0):
         entry = row['Close']
         if direction == 'LONG':
-            # SL below the recent 3-candle low (FVG area)
-            sl = row['Low'] * 0.9995 # ~5-10 pips below
+            sl = row['Low'] * 0.9995 
         else:
-            # SL above the recent 3-candle high
             sl = row['High'] * 1.0005
             
         sl_dist = abs(entry - sl)
-        if sl_dist < 0.0003: sl_dist = 0.0005 # Tighter scalper stops
+        if sl_dist < 0.0003: sl_dist = 0.0005 
         
-        # SCALPER RR: 1:1.5 (Rapid exits for high frequency)
+        # SCALPER RR: 1:1.5
         tp = entry + (sl_dist * 1.5) if direction == 'LONG' else entry - (sl_dist * 1.5)
-        units = (self.balance * 0.01) / sl_dist
+        # Apply risk_val from Analyst
+        units = (self.balance * (0.01 * risk_val)) / sl_dist
         
         self.trades.append({
             'ticker': ticker, 'dir': direction, 'entry': entry, 'sl': sl, 'sl_orig': sl, 'tp': tp, 
@@ -160,6 +179,11 @@ class ProfessionalBacktesterV8:
         trade['exit_price'] = price
         trade['exit_time'] = ts
         self.balance += net_trade_pnl
+        
+        # Update high water mark and drawdown
+        if self.balance > self.high_water_mark:
+            self.high_water_mark = self.balance
+        self.current_drawdown = (self.high_water_mark - self.balance) / self.high_water_mark
 
     def calculate_metrics(self):
         if not self.trades: return {"status": "NO_TRADES", "performance": {}}
@@ -182,28 +206,32 @@ class ProfessionalBacktesterV8:
             "status": "SUCCESS",
             "performance": {
                 "win_rate": float(win_rate), "net_pnl": float(net_pnl), "max_dd": float(max_dd), 
-                "sharpe": float(sharpe), "total_trades": int(len(df))
+                "sharpe": float(sharpe), "total_trades": int(len(df)), "fees_saved": self.total_fees_saved
             }
         }
 
 if __name__ == "__main__":
-    bt = ProfessionalBacktesterV8(max_trades=2000)
-    
-    # Restoring the WINNING sniper assets (High Liquidity)
     symbols = ["EUR_USD", "GBP_USD", "XAU_USD", "NAS100_USD", "USD_JPY", "AUD_USD", "USD_CAD", "EUR_JPY"]
     
-    for t in symbols:
-        bt.run_backtest(t)
-        
-    metrics = bt.calculate_metrics()
+    print("\n" + "="*60)
+    print("      A/B TEST: STANDARD SCALPER VS BOT 5 ANALYST")
+    print("="*60)
     
-    print("\n" + "="*50)
-    print("WINNING SNIPER AUDIT (RESTORED V9.5)")
-    print("="*50)
-    print(json.dumps(metrics, indent=4))
+    # MOD A: Standard Scalper (No Bot 5)
+    bt_std = ProfessionalBacktesterV8(use_analyst=False)
+    for t in symbols: bt_std.run_backtest(t)
+    res_std = bt_std.calculate_metrics()["performance"]
     
-    # Print for app.py capture
-    # The 'new_entry' variable is no longer defined in this scope after the requested changes.
-    # To maintain syntactical correctness and faithfully apply the diff, this line is removed.
-    # print(json.dumps(new_entry, indent=4))
-
+    # MOD B: With Bot 5 Analyst (Spread & Risk scaling)
+    bt_ai = ProfessionalBacktesterV8(use_analyst=True)
+    for t in symbols: bt_ai.run_backtest(t)
+    res_ai = bt_ai.calculate_metrics()["performance"]
+    
+    print(f"\n{'METRIC':<20} | {'STANDARD':<15} | {'BOT 5 AI':<15} | {'DIFF'}")
+    print("-" * 65)
+    print(f"{'Total Trades':<20} | {res_std['total_trades']:<15} | {res_ai['total_trades']:<15} | {res_ai['total_trades']-res_std['total_trades']}")
+    print(f"{'Net PnL ($)':<20} | {res_std['net_pnl']:<15.2f} | {res_ai['net_pnl']:<15.2f} | {res_ai['net_pnl']-res_std['net_pnl']:.2f}")
+    print(f"{'Max Drawdown (%)':<20} | {res_std['max_dd']:<15.2f} | {res_ai['max_dd']:<15.2f} | {res_ai['max_dd']-res_std['max_dd']:.2f}")
+    print(f"{'Sharpe Ratio':<20} | {res_std['sharpe']:<15.2f} | {res_ai['sharpe']:<15.2f} | {res_ai['sharpe']-res_std['sharpe']:.2f}")
+    print(f"{'High Spread Avoided':<20} | {'0':<15} | {res_ai['fees_saved']:<15} | +{res_ai['fees_saved']}")
+    print("="*60)

@@ -123,8 +123,14 @@ class Bot2Hunter(BaseAgent):
         import time
         import random
         # 1. GITHUB HUNTING
-        github_queries = ["PineScript trading strategy", "MQL5 EA expert advisor", "forex order flow python",
-                          "mean reversion algorithmic trading", "crypto grid bot python", "ICT forex github"]
+        github_queries = [
+            "PineScript scalping strategy 1m", 
+            "MQL5 HFT expert advisor", 
+            "forex order flow scalping python",
+            "high frequency trading algorithms", 
+            "1 minute scalping bot python", 
+            "ICT scalper github"
+        ]
         random.shuffle(github_queries) # Her döngüde aramaları karıştır
         
         for query in github_queries[:3]: # Her seferinde farklı 3 konsepti ara ki API limitine takılmayalım

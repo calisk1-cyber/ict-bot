@@ -95,11 +95,21 @@ class ProfessionalBacktesterV8:
             is_discount = row['Close'] < midpoint
             is_premium = row['Close'] > midpoint
             
-            # 24/7 ICT Logic (Sniper Mode - Fixed)
-            if score >= 35 and row.get('BIAS') == "BULLISH" and is_discount:
+            # --- AGGRESSIVE SCALPER PIVOT (HFT MODE) ---
+            # Lowering threshold from 35 to 20 for 10x more trades
+            # Adding RSI as a fast scalper filter
+            if 'RSI' not in df_5m.columns:
+                df_5m['RSI'] = ta.rsi(df_5m['Close'], length=14)
+                
+            rsi = df_5m['RSI'].iloc[i]
+            
+            # 24/7 Scalper Logic (Aggressive Mode)
+            # Threshold: 20 (Reduced from 35)
+            # Conditions: Score + RSI Overbought/Oversold + HTF Bias
+            if score >= 20 and row.get('BIAS') == "BULLISH" and rsi < 60:
                 self.open_trade(ticker, 'LONG', row, ts, pip_size, score)
                 active_trade = self.trades[-1]
-            elif score <= -35 and row.get('BIAS') == "BEARISH" and is_premium: 
+            elif score <= -20 and row.get('BIAS') == "BEARISH" and rsi > 40: 
                 self.open_trade(ticker, 'SHORT', row, ts, pip_size, score)
                 active_trade = self.trades[-1]
 
@@ -117,9 +127,10 @@ class ProfessionalBacktesterV8:
             sl = row['High'] * 1.0005
             
         sl_dist = abs(entry - sl)
-        if sl_dist < 0.0005: sl_dist = 0.0015 # Minimum safe distance
+        if sl_dist < 0.0003: sl_dist = 0.0005 # Tighter scalper stops
         
-        tp = entry + (sl_dist * 3) if direction == 'LONG' else entry - (sl_dist * 3) # 1:3 RR is more realistic
+        # SCALPER RR: 1:1.5 (Rapid exits for high frequency)
+        tp = entry + (sl_dist * 1.5) if direction == 'LONG' else entry - (sl_dist * 1.5)
         units = (self.balance * 0.01) / sl_dist
         
         self.trades.append({

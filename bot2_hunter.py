@@ -41,7 +41,7 @@ class Bot2Hunter(BaseAgent):
         self.logger.info("Searching ArXiv for new Q-Fin papers...")
         import urllib.request
         import xml.etree.ElementTree as ET
-        url = "http://export.arxiv.org/api/query?search_query=cat:q-fin.TR&sortBy=submittedDate&sortOrder=desc&max_results=3"
+        url = "http://export.arxiv.org/api/query?search_query=cat:q-fin.TR&sortBy=submittedDate&sortOrder=descending&max_results=3"
         papers = []
         try:
             response = urllib.request.urlopen(url)

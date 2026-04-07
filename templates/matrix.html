@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MAIA - Matrix AI Analyst</title>
+    <style>
+        :root {
+            --matrix-green: #00ff41;
+            --matrix-dark: #003b00;
+            --bg-black: #0d0208;
+            --terminal-font: 'Courier New', Courier, monospace;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background-color: var(--bg-black);
+            color: var(--matrix-green);
+            font-family: var(--terminal-font);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        #matrix-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            z-index: -1;
+            opacity: 0.15;
+        }
+
+        header {
+            padding: 20px;
+            border-bottom: 2px solid var(--matrix-green);
+            background: rgba(0, 0, 0, 0.8);
+            text-align: center;
+            box-shadow: 0 0 15px var(--matrix-green);
+        }
+
+        h1 {
+            font-size: 24px;
+            letter-spacing: 5px;
+            text-shadow: 0 0 10px var(--matrix-green);
+            text-transform: uppercase;
+        }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            padding: 30px;
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .bot-card {
+            background: rgba(0, 59, 0, 0.1);
+            border: 1px solid var(--matrix-green);
+            padding: 20px;
+            position: relative;
+            box-shadow: inset 0 0 10px rgba(0, 255, 65, 0.2);
+            transition: all 0.3s ease;
+        }
+
+        .bot-card:hover {
+            box-shadow: 0 0 20px rgba(0, 255, 65, 0.4);
+            transform: scale(1.02);
+        }
+
+        .bot-name {
+            font-size: 18px;
+            font-bold: bold;
+            margin-bottom: 10px;
+            border-bottom: 1px solid var(--matrix-green);
+            padding-bottom: 5px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .status-badge {
+            font-size: 12px;
+            padding: 2px 8px;
+            background: var(--matrix-green);
+            color: black;
+            border-radius: 2px;
+        }
+
+        .bot-status {
+            font-size: 14px;
+            margin-top: 10px;
+            min-height: 40px;
+        }
+
+        .last-update {
+            font-size: 10px;
+            color: #008f11;
+            margin-top: 15px;
+            text-align: right;
+        }
+
+        .glitch {
+            animation: glitch-anim 1s infinite linear alternate-reverse;
+        }
+
+        @keyframes glitch-anim {
+            0% { text-shadow: 2px 0 red; }
+            50% { text-shadow: -2px 0 blue; }
+            100% { text-shadow: 0 0 var(--matrix-green); }
+        }
+
+        footer {
+            padding: 10px;
+            font-size: 12px;
+            text-align: center;
+            border-top: 1px solid var(--matrix-green);
+            background: black;
+        }
+
+        .data-stream {
+            font-size: 12px;
+            color: #00b400;
+            margin-top: 10px;
+            padding: 5px;
+            background: rgba(0, 255, 65, 0.05);
+            max-height: 100px;
+            overflow: hidden;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="matrix-canvas"></canvas>
+    
+    <header>
+        <h1 class="glitch">MAIA SYSTEM MONITOR</h1>
+        <p>RE-ENTER THE MATRIX // ICT BOT V1.2</p>
+    </header>
+
+    <div class="dashboard" id="bot-grid">
+        <!-- Bot cards will go here -->
+         <div class="bot-card">
+            <div class="bot-name">INITIALIZING...</div>
+            <div class="bot-status">Establishing secure connection to Redis...</div>
+         </div>
+    </div>
+
+    <footer>
+        SECURE CHANNEL: VPS 64.226.97.23 // SYNC STATUS: ACTIVE
+    </footer>
+
+    <script>
+        // Matrix Background
+        const canvas = document.getElementById('matrix-canvas');
+        const ctx = canvas.getContext('2d');
+
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789$+-*/%=<>!&|?@#{}[]';
+        const fontSize = 16;
+        const columns = canvas.width / fontSize;
+
+        const drops = [];
+        for (let i = 0; i < columns; i++) {
+            drops[i] = 1;
+        }
+
+        function drawMatrix() {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.fillStyle = '#0F0';
+            ctx.font = fontSize + 'px monospace';
+
+            for (let i = 0; i < drops.length; i++) {
+                const text = characters.charAt(Math.floor(Math.random() * characters.length));
+                ctx.fillText(text, i * fontSize, drops[i] * fontSize);
+
+                if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) {
+                    drops[i] = 0;
+                }
+                drops[i]++;
+            }
+        }
+
+        setInterval(drawMatrix, 50);
+
+        // API Fetching
+        async function updateDashboard() {
+            try {
+                const response = await fetch('/api/bot_statuses');
+                const data = await response.json();
+                
+                const grid = document.getElementById('bot-grid');
+                grid.innerHTML = '';
+
+                Object.keys(data).sort().forEach(botName => {
+                    const info = data[botName];
+                    const card = document.createElement('div');
+                    card.className = 'bot-card';
+                    
+                    const time = new Date(info.last_update).toLocaleTimeString();
+                    
+                    // Render recent logs
+                    let logHtml = '';
+                    if (info.recent_logs && info.recent_logs.length > 0) {
+                        logHtml = info.recent_logs.map(log => `<div>${log}</div>`).join('');
+                    } else {
+                        logHtml = 'No recent activity logs.';
+                    }
+
+                    card.innerHTML = `
+                        <div class="bot-name">
+                            ${info.agent_name.toUpperCase()}
+                            <span class="status-badge">ACTIVE</span>
+                        </div>
+                        <div class="bot-status">> STATUS: ${info.status}</div>
+                        <div class="data-stream">${logHtml}</div>
+                        <div class="last-update">L-SYNC: ${time}</div>
+                    `;
+                    grid.appendChild(card);
+                });
+
+                if (Object.keys(data).length === 0) {
+                   grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; margin-top: 50px;">WAITING FOR AGENT HEARTBEATS...</div>';
+                }
+
+            } catch (error) {
+                console.error('Fetch error:', error);
+            }
+        }
+
+        setInterval(updateDashboard, 2000);
+        updateDashboard();
+
+        window.onresize = () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        };
+    </script>
+</body>
+</html>

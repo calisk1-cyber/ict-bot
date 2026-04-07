@@ -108,33 +108,28 @@ class ProfessionalBacktesterV8:
                 
             rsi = df_5m['RSI'].iloc[i]
             
-            # --- BOT 5 ANALYST SIMULATION ---
-            # 1. Dynamic Spread Watchdog (ATR-based volatility simulation)
+            # --- STABILITY PATCH (V10.6) ---
+            # 1. Restoring High-Conviction Threshold (20 -> 35)
+            # 2. Volatility Check (ATR * 1.5)
             if 'ATR' not in df_5m.columns:
                 df_5m['ATR'] = ta.atr(df_5m['High'], df_5m['Low'], df_5m['Close'], length=14)
             
             atr = df_5m['ATR'].iloc[i]
             avg_atr = df_5m['ATR'].rolling(50).mean().iloc[i] or atr
-            is_high_vol = atr > (avg_atr * 1.5)
+            is_unstable = atr > (avg_atr * 1.5)
             
-            # 2. Dynamic Risk Scaling
+            if is_unstable: continue 
+
+            # 3. Dynamic Risk Scaling
             risk_val = 1.0
-            if self.use_analyst and self.current_drawdown > 0.10: 
-                risk_val = 0.25 
+            if self.current_drawdown > 0.15: 
+                risk_val = 0.50 
             
-            # 24/7 Scalper Logic (Aggressive Mode)
-            # Threshold: 20 (Reduced from 35)
-            # Conditions: Score + RSI Overbought/Oversold + HTF Bias
-            if score >= 20 and row.get('BIAS') == "BULLISH" and rsi < 60:
-                if self.use_analyst and is_high_vol:
-                    self.total_fees_saved += 1
-                    continue
+            # Scalper Logic (High Conviction: 35)
+            if score >= 35 and row.get('BIAS') == "BULLISH" and rsi < 60:
                 self.open_trade(ticker, 'LONG', row, ts, pip_size, score, risk_val)
                 active_trade = self.trades[-1]
-            elif score <= -20 and row.get('BIAS') == "BEARISH" and rsi > 40: 
-                if self.use_analyst and is_high_vol:
-                    self.total_fees_saved += 1
-                    continue
+            elif score <= -35 and row.get('BIAS') == "BEARISH" and rsi > 40: 
                 self.open_trade(ticker, 'SHORT', row, ts, pip_size, score, risk_val)
                 active_trade = self.trades[-1]
 
@@ -162,13 +157,18 @@ class ProfessionalBacktesterV8:
         trade['status'] = status
         u = trade['units'] * 0.5 if trade['partial'] else trade['units']
         
-        # --- INSTITUTIONAL AUDIT: SPREAD & COMMISSION ---
-        # 1. Spread Deduction (approx 0.7 pips per trade)
-        spread_cost = 0.00007 * u if "JPY" not in trade['ticker'] else 0.007 * u
-        if "XAU" in trade['ticker']: spread_cost = 0.20 * trade['units'] # $20 per 100oz (typical)
+        # --- INSTITUTIONAL AUDIT: PROPORTIONAL FEES ---
+        # 1. Spread (0.7 pips baseline)
+        if "XAU" in trade['ticker']: spread_cost = 0.20 * u # Gold cost
+        elif "NAS" in trade['ticker'] or "US30" in trade['ticker']: spread_cost = 1.0 * u # Index spread
+        elif "JPY" in trade['ticker']: spread_cost = 0.007 * u # JPY spread
+        else: spread_cost = 0.00007 * u # FX spread
         
-        # 2. Commission (approx $7 per 1.0 lot / 100k units round-turn)
-        commission = (u / 100000) * 7.0
+        # 2. Commission (per 100k units for FX, per unit for Indices)
+        if "NAS" in trade['ticker'] or "US30" in trade['ticker']:
+            commission = u * 0.02 # $2 per 100 unit index
+        else:
+            commission = (u / 100000) * 7.0
         
         # Raw PnL
         pnl = (price - trade['entry']) * u if trade['dir'] == 'LONG' else (trade['entry'] - price) * u

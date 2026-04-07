@@ -5,7 +5,7 @@
 # ============================================================
 set -e
 
-BOT_DIR="/root/bot"
+BOT_DIR="/root/ict-bot"
 LOG_DIR="$BOT_DIR/logs"
 
 echo "=================================================="
@@ -46,7 +46,7 @@ mkdir -p "$LOG_DIR"
 echo ""
 echo "🐍 [5/7] Python bağımlılıkları yükleniyor..."
 cd "$BOT_DIR"
-pip3 install -r requirements.txt
+pip3 install -r requirements.txt --break-system-packages
 
 # 6. Node bağımlılıklarını kur
 echo ""

@@ -6,7 +6,7 @@ import json
 from datetime import datetime
 
 class ProfessionalBacktesterV8:
-    def __init__(self, initial_balance=10000, max_trades=1000, use_analyst=False):
+    def __init__(self, initial_balance=10000, max_trades=5000, use_analyst=False):
         self.initial_balance = initial_balance
         self.balance = float(initial_balance)
         self.max_trades = max_trades
@@ -117,23 +117,24 @@ class ProfessionalBacktesterV8:
             avg_atr = df_5m['ATR'].rolling(50).mean().iloc[i] or atr
             is_high_vol = atr > (avg_atr * 1.5)
             
-            # Bot 5 skips high spread/volatility periods
-            if self.use_analyst and is_high_vol:
-                self.total_fees_saved += 1 # Metric placeholder
-                continue 
-
             # 2. Dynamic Risk Scaling
             risk_val = 1.0
             if self.use_analyst and self.current_drawdown > 0.10: 
-                risk_val = 0.25 # Scale down to 1/4 risk during DD
+                risk_val = 0.25 
             
             # 24/7 Scalper Logic (Aggressive Mode)
             # Threshold: 20 (Reduced from 35)
             # Conditions: Score + RSI Overbought/Oversold + HTF Bias
             if score >= 20 and row.get('BIAS') == "BULLISH" and rsi < 60:
+                if self.use_analyst and is_high_vol:
+                    self.total_fees_saved += 1
+                    continue
                 self.open_trade(ticker, 'LONG', row, ts, pip_size, score, risk_val)
                 active_trade = self.trades[-1]
             elif score <= -20 and row.get('BIAS') == "BEARISH" and rsi > 40: 
+                if self.use_analyst and is_high_vol:
+                    self.total_fees_saved += 1
+                    continue
                 self.open_trade(ticker, 'SHORT', row, ts, pip_size, score, risk_val)
                 active_trade = self.trades[-1]
 

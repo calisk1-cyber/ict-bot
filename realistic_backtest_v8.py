@@ -212,27 +212,15 @@ class ProfessionalBacktesterV8:
         }
 
 if __name__ == "__main__":
+    bt = ProfessionalBacktesterV8(max_trades=5000)
     symbols = ["EUR_USD", "GBP_USD", "XAU_USD", "NAS100_USD", "USD_JPY", "AUD_USD", "USD_CAD", "EUR_JPY"]
     
-    print("\n" + "="*60)
-    print("      A/B TEST: STANDARD SCALPER VS BOT 5 ANALYST")
-    print("="*60)
+    print("\n" + "="*50)
+    print("      HFT SCALPER PERFORMANCE AUDIT (V10.2)")
+    print("="*50)
     
-    # MOD A: Standard Scalper (No Bot 5)
-    bt_std = ProfessionalBacktesterV8(use_analyst=False)
-    for t in symbols: bt_std.run_backtest(t)
-    res_std = bt_std.calculate_metrics()["performance"]
-    
-    # MOD B: With Bot 5 Analyst (Spread & Risk scaling)
-    bt_ai = ProfessionalBacktesterV8(use_analyst=True)
-    for t in symbols: bt_ai.run_backtest(t)
-    res_ai = bt_ai.calculate_metrics()["performance"]
-    
-    print(f"\n{'METRIC':<20} | {'STANDARD':<15} | {'BOT 5 AI':<15} | {'DIFF'}")
-    print("-" * 65)
-    print(f"{'Total Trades':<20} | {res_std['total_trades']:<15} | {res_ai['total_trades']:<15} | {res_ai['total_trades']-res_std['total_trades']}")
-    print(f"{'Net PnL ($)':<20} | {res_std['net_pnl']:<15.2f} | {res_ai['net_pnl']:<15.2f} | {res_ai['net_pnl']-res_std['net_pnl']:.2f}")
-    print(f"{'Max Drawdown (%)':<20} | {res_std['max_dd']:<15.2f} | {res_ai['max_dd']:<15.2f} | {res_ai['max_dd']-res_std['max_dd']:.2f}")
-    print(f"{'Sharpe Ratio':<20} | {res_std['sharpe']:<15.2f} | {res_ai['sharpe']:<15.2f} | {res_ai['sharpe']-res_std['sharpe']:.2f}")
-    print(f"{'High Spread Avoided':<20} | {'0':<15} | {res_ai['fees_saved']:<15} | +{res_ai['fees_saved']}")
-    print("="*60)
+    for t in symbols:
+        bt.run_backtest(t)
+        
+    metrics = bt.calculate_metrics()
+    print(json.dumps(metrics, indent=4))

@@ -273,10 +273,10 @@ async def stream_prices_loop():
                 )
                 df_signals = df.rename(columns={"close": "Close"})
                 # Ensure evolved logic has required OHLC columns (aliased to Close for tick stream)
-                df_signals['open'] = df_signals['Close']
-                df_signals['high'] = df_signals['Close']
-                df_signals['low'] = df_signals['Close']
-                df_signals['close'] = df_signals['Close']
+                df_signals['Open'] = df_signals['Close']
+                df_signals['High'] = df_signals['Close']
+                df_signals['Low'] = df_signals['Close']
+                df_signals['Close'] = df_signals['Close']
                 
                 df_signals = find_fvg_v3(df_signals)
                 df_signals = find_turtle_soup_v2(df_signals)

@@ -1,8 +1,49 @@
 {
-    "latest_r_and_d": [
-        "SMT Divergence: EURUSD vs GBPUSD low/high mismatch.",
-        "MSS: Closing above/below recent high/low as entry signal.",
-        "Premium/Discount Zones: Only trade in discount for longs.",
-        "Daily Open Cross: London open vs Daily open relationship."
-    ]
+  "system_version": "V13.0 Algorithmic Master",
+  "institutional_rules": {
+    "IPDA_Data_Ranges": {
+      "lookbacks": [20, 40, 60],
+      "purpose": "Identify algorithmic liquidity pools and fair value equilibrium.",
+      "action": "Mark highs/lows of these ranges. Sweeps of these levels are high probability reversal triggers."
+    },
+    "SMT_Divergence": {
+      "correlated_pairs": ["EUR_USD", "GBP_USD"],
+      "inverse_pair": "DXY",
+      "logic": "If EUR makes HH but GBP fails (making LH), it is a Bearish SMT (Institutional Distribution)."
+    },
+    "MMXM_Models": {
+      "MMBM": "Original Consolidation -> Engineering Liquidity -> SMR (Smart Money Reversal) -> Distribution to original range.",
+      "MMSM": "Bearish version of MMBM.",
+      "SMR_Trigger": "HTF PD Array tap + LFT MSS with displacement."
+    },
+    "Standard_Deviation_Projections": {
+      "levels": [-2.0, -2.5, -4.0],
+      "application": "Project from the manipulation leg (leg before SMR) to find high-probability reversal targets."
+    },
+    "OTE_Optimal_Trade_Entry": {
+      "range": [0.62, 0.79],
+      "sniper_level": 0.705
+    },
+    "Silver_Bullet_Windows": {
+      "London": "03:00 - 04:00 AM NY (10:00 - 11:00 TSİ)",
+      "NY_AM": "10:00 - 11:00 AM NY (17:00 - 18:00 TSİ)",
+      "NY_PM": "02:00 - 03:00 PM NY (21:00 - 22:00 TSİ)",
+      "Logic": "The Silver Bullet: High-probability 60-minute windows."
+    },
+    "Macro_Timing_Blocks": {
+      "NY_AM_Start": "09:50 - 10:10 AM NY",
+      "NY_AM_End": "10:50 - 11:10 AM NY",
+      "NY_Lunch": "11:50 - 12:10 PM NY"
+    },
+    "V16_Sovereign_Rules": {
+      "AMD_Fractal": "Accumulation (Asia) -> Manipulation (London Judas) -> Distribution (NY Expansion).",
+      "Weekly_Profiles": {
+          "Classic_Tuesday": "Weekly High/Low forms by Tuesday London or NY AM.",
+          "Midweek_Reversal": "Trend reversal on Wednesday after tapping HTF POI.",
+          "Seek_and_Destroy": "Range-bound week clearing both sides before big move."
+      },
+      "Liquidity_Void": "Price returns to fill 80% of an impulsive candle void.",
+      "Quarterly_Theory": "Market shifts trends every 3 months (Quarterly Shifts). Monitor first 2 weeks of the quarter."
+    }
+  }
 }

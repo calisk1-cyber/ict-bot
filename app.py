@@ -12,7 +12,7 @@ from oandapyV20 import API
 import oandapyV20.endpoints.orders as orders
 import oandapyV20.endpoints.instruments as instruments
 import oandapyV20.endpoints.pricing as pricing
-from oandapyV20.endpoints import trades
+from oandapyV20.endpoints import trades, accounts
 
 from ict_utils import (
     is_in_algorithmic_window_v18, apply_ict_v18_omniscient, 

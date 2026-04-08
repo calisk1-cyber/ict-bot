@@ -270,10 +270,10 @@ async def stream_prices_loop():
         if msg.get('type') == 'PRICE':
             ticker = msg['instrument']
             
-            # --- HIGH IMPACT NEWS FILTER ---
-            if is_high_impact_news_active(ticker):
-                print(f"⚠️ [NEWS PROTECT] Skipping {ticker} due to high impact news.")
-                continue
+            # --- HIGH IMPACT NEWS FILTER (DISABLED FOR 100% BACKTEST PARITY) ---
+            # if is_high_impact_news_active(ticker):
+            #     print(f"⚠️ [NEWS PROTECT] Skipping {ticker} due to high impact news.")
+            #     continue
 
             price = float(msg['bids'][0]['price'])
             history[ticker].append({"time": datetime.now(timezone.utc), "close": price})

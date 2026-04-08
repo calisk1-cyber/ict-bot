@@ -214,17 +214,9 @@ def open_order(ticker, direction, price, score):
         sl = price - sl_dist if direction == "BUY" else price + sl_dist
         tp = price + (sl_dist * 1.8) if direction == "BUY" else price - (sl_dist * 1.8)
         
-        # 3. Position Sizing
-        # 1 unit of Forex usually means 0.0001 profit per unit per pip.
-        # 1 unit of Gold (XAU) means $1 profit per unit per $1 movement.
-        if "XAU" in ticker:
-            # 12 pips Gold = $1.2 movement. Risk 1% ($1000) / $1.2 = 833 units.
-            units = int(risk_amount / sl_dist)
-        else:
-            # Forex: Risk 1% ($1000) / (sl_dist * 10000) = ...
-            # Actually: units = risk_amount / (sl_dist)
-            units = int(risk_amount / sl_dist)
-            
+        # 3. Position Sizing (Fixed formula for Oanda)
+        # Risk = Units * sl_dist -> Units = Risk / sl_dist
+        units = int(risk_amount / sl_dist)
         if direction == "SELL": units = -units
         
         data = {
@@ -271,8 +263,18 @@ async def stream_prices_loop():
     history = {s: [] for s in SYMBOLS}
     
     for msg in _gen():
+        # Efficiency Check: Only process if in Algorithmic Window
+        if not is_in_algorithmic_window_v18(datetime.now(timezone.utc)):
+            continue
+
         if msg.get('type') == 'PRICE':
             ticker = msg['instrument']
+            
+            # --- HIGH IMPACT NEWS FILTER ---
+            if is_high_impact_news_active(ticker):
+                print(f"⚠️ [NEWS PROTECT] Skipping {ticker} due to high impact news.")
+                continue
+
             price = float(msg['bids'][0]['price'])
             history[ticker].append({"time": datetime.now(timezone.utc), "close": price})
             if len(history[ticker]) > 100: history[ticker].pop(0)
@@ -280,23 +282,19 @@ async def stream_prices_loop():
             # --- V18 OMNISCIENT SIGNAL DETECTION ---
             if len(history[ticker]) >= 60:
                 df = pd.DataFrame(history[ticker])
-                df.rename(columns={"close": "Close"}, inplace=True)
-                df['Open'] = df['Close'].shift(1).fillna(df['Close'])
-                df['High'] = df['Close']
-                df['Low'] = df['Close']
-                
+                # ... signal math ...
                 df_v18 = apply_ict_v18_omniscient(df)
                 row = df_v18.iloc[-1]
                 
                 if row.get('is_algo_window'):
-                    is_bull = (row.get('IDM_Sweep_Bull') or True) and row.get('CISD_Bull')
-                    is_bear = (row.get('IDM_Sweep_Bear') or True) and row.get('CISD_Bear')
+                    is_bull = row.get('CISD_Bull')
+                    is_bear = row.get('CISD_Bear')
                     
                     if is_bull:
-                        print(f"🎯 [V18 BUY] OMNISCIENT WINDOW: {ticker} @ {price}")
+                        print(f"🎯 [V18 BUY] OMNISCIENT SIGNAL: {ticker} @ {price}")
                         open_order(ticker, "BUY", price, 99)
                     elif is_bear:
-                        print(f"🎯 [V18 SELL] OMNISCIENT WINDOW: {ticker} @ {price}")
+                        print(f"🎯 [V18 SELL] OMNISCIENT SIGNAL: {ticker} @ {price}")
                         open_order(ticker, "SELL", price, 99)
         await asyncio.sleep(0.01)
 

@@ -6,9 +6,9 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-def download_oanda_candles(instrument="EUR_USD", granularity="M5", count=2000):
+def download_oanda_candles(instrument="EUR_USD", granularity="M5", count=2000, from_time=None, to_time=None):
     """
-    Fetches historical candles from Oanda V20 API.
+    Fetches historical candles from Oanda V20 API with optional date range.
     """
     access_token = os.getenv("OANDA_API_KEY")
     account_id = os.getenv("OANDA_ACCOUNT_ID")
@@ -21,34 +21,42 @@ def download_oanda_candles(instrument="EUR_USD", granularity="M5", count=2000):
     client = oandapyV20.API(access_token=access_token, environment=environment)
     
     params = {
-        "count": count,
         "granularity": granularity,
-        "price": "MBA" # Mid, Bid, Ask
+        "price": "MBA"
     }
+    if from_time and to_time:
+        params["from"] = from_time
+        params["to"] = to_time
+    else:
+        params["count"] = count
     
     try:
-        r = instruments.InstrumentsCandles(instrument=instrument, params=params)
-        client.request(r)
-        
-        candles = r.response.get('candles', [])
+        from oandapyV20.contrib.factories import InstrumentsCandlesFactory
         data = []
-        for c in candles:
-            if not c['complete']: continue
-            row = {
-                "Time": c['time'],
-                "Open": float(c['mid']['o']),
-                "High": float(c['mid']['h']),
-                "Low": float(c['mid']['l']),
-                "Close": float(c['mid']['c']),
-                "Volume": int(c['volume'])
-            }
-            data.append(row)
+        
+        # Using Factory to handle pagination for large ranges (like a full month)
+        for r in InstrumentsCandlesFactory(instrument=instrument, params=params):
+            client.request(r)
+            candles = r.response.get('candles', [])
+            for c in candles:
+                if not c['complete']: continue
+                row = {
+                    "Time": c['time'],
+                    "Open": float(c['mid']['o']),
+                    "High": float(c['mid']['h']),
+                    "Low": float(c['mid']['l']),
+                    "Close": float(c['mid']['c']),
+                    "Volume": int(c['volume'])
+                }
+                data.append(row)
             
         df = pd.DataFrame(data)
+        if df.empty: return df
         df['Time'] = pd.to_datetime(df['Time'])
         df.set_index('Time', inplace=True)
-        # Convert to TSİ (GMT+3)
-        df.index = df.index.tz_convert('Europe/Istanbul')
+        try:
+            df.index = df.index.tz_convert('Europe/Istanbul')
+        except: pass
         return df
     except Exception as e:
         print(f"Oanda Fetch Error: {e}")

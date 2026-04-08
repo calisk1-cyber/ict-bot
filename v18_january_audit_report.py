@@ -31,7 +31,11 @@ class JanuaryAuditReport:
             df_5m = download_oanda_candles(sym, "M5", from_time=from_t, to_time=to_t)
             df_1h = download_oanda_candles(sym, "H1", from_time=from_t, to_time=to_t)
             
-            if df_5m.empty: continue
+            if df_5m.empty: 
+                print(f"!! {sym} için veri çekilemedi. Oanda API anahtarını kontrol et.")
+                continue
+            
+            print(f"-> {len(df_5m)} M5 barı çekildi. Backtest başlıyor...")
             
             df_v18 = apply_ict_v18_omniscient(df_5m)
             df_1h['HTF_Bias'] = [get_smc_bias_v11(df_1h.iloc[:i+1].tail(20)) for i in range(len(df_1h))]
@@ -51,8 +55,12 @@ class JanuaryAuditReport:
                         p_price = active_trade['sl'] if hit_sl else active_trade['tp']
                         pnl_pts = (p_price - active_trade['entry']) if active_trade['type'] == "BUY" else (active_trade['entry'] - p_price)
                         mult = 100 if "XAU" in sym else 20000
-                        self.balance += (pnl_pts * mult) - 2.0
-                        self.trades.append(pnl_pts * mult)
+                        pnl_usd = (pnl_pts * mult) - 2.0
+                        self.balance += pnl_usd
+                        self.trades.append(pnl_usd)
+                        
+                        outcome = "TP" if pnl_usd > 0 else "SL"
+                        print(f"   [{active_trade['type']}] {active_trade['time']} @ {active_trade['entry']:.5f} -> {outcome} ({pnl_usd:+.2f}$)")
                         active_trade = None
                     continue
 
@@ -66,7 +74,7 @@ class JanuaryAuditReport:
                     dist = 2.0 if "XAU" in sym else 0.0012
                     sl = (ote - dist) if is_bull else (ote + dist)
                     tp = ote + (ote - sl) * 1.8
-                    active_trade = {"type": "BUY" if is_bull else "SELL", "entry": ote, "sl": sl, "tp": tp}
+                    active_trade = {"type": "BUY" if is_bull else "SELL", "entry": ote, "sl": sl, "tp": tp, "time": row.name}
 
         self.generate_report()
 

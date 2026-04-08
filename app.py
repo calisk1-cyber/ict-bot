@@ -44,7 +44,7 @@ DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///ict_bot.db")
 engine = create_engine(DATABASE_URL)
 Session = sessionmaker(bind=engine)
 
-SYMBOLS = ["EUR_USD", "GBP_USD", "USD_JPY", "AUD_USD", "USD_CAD"]
+SYMBOLS = ["USD_JPY", "XAU_USD", "USD_CAD"]
 # oanda_api = API(access_token=OANDA_ACCESS_TOKEN, environment="practice" if "practice" in OANDA_ACCOUNT_ID else "live") # REMOVED: BROKEN
 
 # --- FLASK APP ---

@@ -17,8 +17,8 @@ class FebruaryFullAudit:
         self.balance = 100000.0
         self.trades_log = []
         self.all_returns = []
-        # Total major portfolio
-        self.symbols = ["EUR_USD", "GBP_USD", "USD_JPY", "AUD_USD", "XAU_USD"]
+        # ELITE PORTFOLIO ONLY (Pruned based on Audit)
+        self.symbols = ["USD_JPY", "XAU_USD", "USD_CAD"]
 
     def run(self):
         print("\n" + "="*60)

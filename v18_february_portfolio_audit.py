@@ -13,19 +13,22 @@ def calculate_sharpe(returns):
 
 class FebruaryFullAudit:
     def __init__(self):
-        self.initial_balance = 1000.0
-        self.balance = 1000.0
+        self.initial_balance = 100000.0 # Standard Institutional Kasa
+        self.balance = 100000.0
         self.trades_log = []
         self.all_returns = []
-        self.symbols = ["EUR_USD", "GBP_USD", "USD_JPY", "AUD_USD", "USD_CAD", "NZD_USD", "XAU_USD"]
+        # Total major portfolio
+        self.symbols = ["EUR_USD", "GBP_USD", "USD_JPY", "AUD_USD", "XAU_USD"]
 
     def run(self):
         print("\n" + "="*60)
-        print(" SINGULARITY V18 - FEBRUARY 2024 FULL PORTFOLIO AUDIT ")
+        print(" SINGULARITY V18 - FEBRUARY 2024 (1% RISK AUDIT) ")
         print("="*60)
         
         from_t = "2024-02-01T00:00:00Z"
         to_t = "2024-03-01T00:00:00Z"
+        
+        risk_per_trade = 1000.0 # 1% of 100k
         
         portfolio_stats = []
 
@@ -57,9 +60,11 @@ class FebruaryFullAudit:
                     
                     if hit_sl or hit_tp:
                         p_price = active_trade['sl'] if hit_sl else active_trade['tp']
-                        pnl_pts = (p_price - active_trade['entry']) if active_trade['type'] == "BUY" else (active_trade['entry'] - p_price)
-                        mult = 100 if "XAU" in sym else 20000
-                        pnl_usd = (pnl_pts * mult) - 2.0
+                        # Calculate Risk Amount ($1000 per trade)
+                        # pnl_usd = (p_price - entry) / (sl - entry) * risk_per_trade
+                        pnl_ratio = (p_price - active_trade['entry']) / (active_trade['sl'] - active_trade['entry'])
+                        pnl_usd = -(pnl_ratio * 1000.0) - 2.5 # $2.5 comm
+                        
                         self.balance += pnl_usd
                         self.all_returns.append(pnl_usd)
                         sym_trades += 1

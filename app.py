@@ -15,8 +15,8 @@ import oandapyV20.endpoints.pricing as pricing
 from oandapyV20.endpoints import trades
 
 from ict_utils import (
-    is_silver_bullet_zone, find_fvg_v3, 
-    get_smc_bias, find_mss_v2, detect_amd_phases_v2
+    is_in_algorithmic_window_v18, apply_ict_v18_omniscient, 
+    calculate_ote_v15
 )
 from news_utils import is_high_impact_news_active
 from daily_risk_manager import DailyRiskManager
@@ -71,7 +71,7 @@ def api_live():
         return jsonify({
             "status": "ONLINE",
             "positions": live_trades,
-            "kill_zone": is_silver_bullet_zone(datetime.now(timezone.utc))
+            "kill_zone": is_in_algorithmic_window_v18(datetime.now(timezone.utc))
         })
     except: return jsonify({"status": "ERROR"})
 
@@ -205,9 +205,9 @@ def open_order(ticker, direction, price, score):
         if "XAU" in ticker: pip = 0.1
         if "NAS" in ticker: pip = 1.0
         
-        sl_dist = 15 * pip # Default 15 pips
+        sl_dist = 12 * pip # Slightly tighter 12 pips for Oanda
         sl = price - sl_dist if direction == "BUY" else price + sl_dist
-        tp = price + (sl_dist * 2) if direction == "BUY" else price - (sl_dist * 2) # 1:2 RR
+        tp = price + (sl_dist * 1.8) if direction == "BUY" else price - (sl_dist * 1.8) # V18 1.8 RR
         
         # 2. Risk Management (1% Risk)
         units = 1000 # Default mini lot
@@ -263,60 +263,27 @@ async def stream_prices_loop():
             history[ticker].append({"time": datetime.now(timezone.utc), "close": price})
             if len(history[ticker]) > 100: history[ticker].pop(0)
             
-                # --- PURE ICT SIGNAL DETECTION (V9.5: 24/7 Mode) ---
+            # --- V18 OMNISCIENT SIGNAL DETECTION ---
             if len(history[ticker]) >= 60:
                 df = pd.DataFrame(history[ticker])
-                # Proxy OHLC from the 1m/tick stream
-                from ict_utils import (
-                    find_fvg_v3, find_turtle_soup_v2, find_new_logic,
-                    find_ifvg, find_silver_bullet, is_macro_time
-                )
-                df_signals = df.rename(columns={"close": "Close"})
-                # Ensure evolved logic has required OHLC columns (aliased to Close for tick stream)
-                df_signals['Open'] = df_signals['Close']
-                df_signals['High'] = df_signals['Close']
-                df_signals['Low'] = df_signals['Close']
-                df_signals['Close'] = df_signals['Close']
+                df.rename(columns={"close": "Close"}, inplace=True)
+                df['Open'] = df['Close'].shift(1).fillna(df['Close'])
+                df['High'] = df['Close']
+                df['Low'] = df['Close']
                 
-                df_signals = find_fvg_v3(df_signals)
-                df_signals = find_turtle_soup_v2(df_signals)
-                df_signals = find_ifvg(df_signals)
-                df_signals = find_silver_bullet(df_signals)
-                df_signals = find_new_logic(df_signals)
+                df_v18 = apply_ict_v18_omniscient(df)
+                row = df_v18.iloc[-1]
                 
-                row = df_signals.iloc[-1]
-                
-                # 1. Premium/Discount Range (Last 50 ticks)
-                low_50 = df['close'].tail(50).min()
-                high_50 = df['close'].tail(50).max()
-                midpoint = (low_50 + high_50) / 2
-                is_discount = price < midpoint
-                is_premium = price > midpoint
-                
-                # 2. Score Calculation (Audit-Optimized Weights)
-                score = 0
-                now_utc = datetime.now(timezone.utc)
-                macro_bonus = 18 if is_macro_time(now_utc) else 0
-
-                if row.get('FVG_Bull'): score += 25
-                if row.get('TurtleSoup_Bull'): score += 20
-                if row.get('IFVG_Bull'): score += 22
-                if row.get('SB_Bull'): score += 20
-                if macro_bonus: score += macro_bonus
-                
-                if row.get('FVG_Bear'): score -= 25
-                if row.get('TurtleSoup_Bear'): score -= 20
-                if row.get('IFVG_Bear'): score -= 22
-                if row.get('SB_Bear'): score -= 20
-                if macro_bonus: score -= macro_bonus
-                
-                # 3. Execution Logic (Strictly Profit-Verified, No Time Limit)
-                if score >= 45 and is_discount:
-                    print(f"🎯 [BUY] 24/7 AI-ICT SIGNAL: {ticker} | Price: {price} | Score: {score}")
-                    open_order(ticker, "BUY", price, score)
-                elif score <= -45 and is_premium:
-                    print(f"🎯 [SELL] 24/7 AI-ICT SIGNAL: {ticker} | Price: {price} | Score: {score}")
-                    open_order(ticker, "SELL", price, score)
+                if row.get('is_algo_window'):
+                    is_bull = (row.get('IDM_Sweep_Bull') or True) and row.get('CISD_Bull')
+                    is_bear = (row.get('IDM_Sweep_Bear') or True) and row.get('CISD_Bear')
+                    
+                    if is_bull:
+                        print(f"🎯 [V18 BUY] OMNISCIENT WINDOW: {ticker} @ {price}")
+                        open_order(ticker, "BUY", price, 99)
+                    elif is_bear:
+                        print(f"🎯 [V18 SELL] OMNISCIENT WINDOW: {ticker} @ {price}")
+                        open_order(ticker, "SELL", price, 99)
         await asyncio.sleep(0.01)
 
 # In streamer loop, before calling signals, add:

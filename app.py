@@ -198,19 +198,33 @@ def run_flask():
     app.run(host='0.0.0.0', port=5000, debug=False, use_reloader=False)
 
 def open_order(ticker, direction, price, score):
-    """Executes a real order on OANDA with structural SL/TP."""
+    """Executes a real order on OANDA with dynamic 1% risk sizing."""
     try:
-        # 1. Structural SL (V9.5 Logic: ~10-15 pips based on asset)
+        # 1. Fetch Account Balance for Risk Calculation
+        r_acc = accounts.AccountSummary(OANDA_ACCOUNT_ID)
+        oanda_api.request(r_acc)
+        balance = float(r_acc.response.get('account', {}).get('balance', 100000.0))
+        risk_amount = balance * 0.01 # 1% Risk
+        
+        # 2. Structural SL
         pip = 0.0001 if "USD" in ticker else 0.01
         if "XAU" in ticker: pip = 0.1
-        if "NAS" in ticker: pip = 1.0
         
-        sl_dist = 12 * pip # Slightly tighter 12 pips for Oanda
+        sl_dist = 12 * pip
         sl = price - sl_dist if direction == "BUY" else price + sl_dist
-        tp = price + (sl_dist * 1.8) if direction == "BUY" else price - (sl_dist * 1.8) # V18 1.8 RR
+        tp = price + (sl_dist * 1.8) if direction == "BUY" else price - (sl_dist * 1.8)
         
-        # 2. Risk Management (1% Risk)
-        units = 1000 # Default mini lot
+        # 3. Position Sizing
+        # 1 unit of Forex usually means 0.0001 profit per unit per pip.
+        # 1 unit of Gold (XAU) means $1 profit per unit per $1 movement.
+        if "XAU" in ticker:
+            # 12 pips Gold = $1.2 movement. Risk 1% ($1000) / $1.2 = 833 units.
+            units = int(risk_amount / sl_dist)
+        else:
+            # Forex: Risk 1% ($1000) / (sl_dist * 10000) = ...
+            # Actually: units = risk_amount / (sl_dist)
+            units = int(risk_amount / sl_dist)
+            
         if direction == "SELL": units = -units
         
         data = {
@@ -224,7 +238,7 @@ def open_order(ticker, direction, price, score):
             }
         }
         
-        print(f"🚀 [EXECUTION] Sending {direction} order for {ticker}...")
+        print(f"🚀 [V18 EXECUTION] {direction} {units} units on {ticker} (Risk: ${risk_amount:.2f})")
         r = orders.OrderCreate(OANDA_ACCOUNT_ID, data=data)
         oanda_api.request(r)
         

@@ -1,175 +1,210 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="tr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ICT Singularity | R&D Dashboard</title>
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+    <title>Singularity HFT Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
-            --bg: #0a0b10;
-            --card-bg: #151921;
-            --accent: #00f2ff;
-            --text: #e0e0e0;
-            --win: #00ff88;
-            --loss: #ff4d4d;
+            --bg-color: #f8fafc;
+            --card-bg: #ffffff;
+            --text-main: #1e293b;
+            --text-muted: #64748b;
+            --primary: #6366f1;
+            --success: #10b981;
+            --danger: #ef4444;
+            --border: #e2e8f0;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', sans-serif;
         }
 
         body {
-            background-color: var(--bg);
-            color: var(--text);
-            font-family: 'Inter', sans-serif;
-            margin: 0;
-            padding: 20px;
-            overflow-x: hidden;
-        }
-
-        h1 {
-            font-family: 'Orbitron', sans-serif;
-            color: var(--accent);
-            text-align: center;
-            text-transform: uppercase;
-            letter-spacing: 4px;
-            margin-bottom: 40px;
-            text-shadow: 0 0 15px rgba(0, 242, 255, 0.5);
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            padding: 2rem;
+            min-height: 100vh;
         }
 
         .container {
-            max-width: 1200px;
+            max-width: 1000px;
             margin: 0 auto;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            padding-bottom: 1.5rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--primary);
+            letter-spacing: -1px;
         }
 
         .stats-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
-            gap: 25px;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1.5rem;
+            margin-bottom: 2rem;
         }
 
-        .experiment-card {
+        .stat-card {
             background: var(--card-bg);
-            border: 1px solid rgba(0, 242, 255, 0.1);
-            border-radius: 12px;
-            padding: 20px;
-            transition: all 0.3s ease;
-            position: relative;
-            overflow: hidden;
+            padding: 1.5rem;
+            border-radius: 1rem;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+            border: 1px solid var(--border);
         }
 
-        .experiment-card:hover {
-            transform: translateY(-5px);
-            border-color: var(--accent);
-            box-shadow: 0 10px 30px rgba(0, 242, 255, 0.1);
+        .stat-label {
+            font-size: 0.875rem;
+            color: var(--text-muted);
+            margin-bottom: 0.5rem;
         }
 
-        .timestamp {
-            font-size: 0.8rem;
-            color: #888;
-            margin-bottom: 10px;
-        }
-
-        .performance {
-            display: flex;
-            justify-content: space-between;
-            margin: 15px 0;
-            padding-bottom: 15px;
-            border-bottom: 1px solid rgba(255,255,255,0.05);
-        }
-
-        .perf-item {
-            text-align: center;
-        }
-
-        .perf-value {
+        .stat-value {
             font-size: 1.5rem;
-            font-weight: 700;
-            font-family: 'Orbitron', sans-serif;
+            font-weight: 600;
         }
 
-        .win-rate { color: var(--win); }
-        .net-profit { color: var(--accent); }
+        .positive { color: var(--success); }
+        .negative { color: var(--danger); }
 
-        .analysis-box {
-            background: rgba(0,0,0,0.3);
-            padding: 15px;
-            border-radius: 8px;
-            font-size: 0.9rem;
-            line-height: 1.5;
-            max-height: 200px;
-            overflow-y: auto;
-            color: #bbb;
-        }
-
-        .knowledge-tags {
+        .trade-list {
             display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-            margin-top: 15px;
+            flex-direction: column;
+            gap: 1rem;
         }
 
-        .tag {
-            background: rgba(0, 242, 255, 0.1);
-            color: var(--accent);
-            padding: 4px 10px;
-            border-radius: 20px;
-            font-size: 0.75rem;
-            border: 1px solid rgba(0, 242, 255, 0.2);
+        .trade-card {
+            background: var(--card-bg);
+            padding: 1.25rem;
+            border-radius: 0.75rem;
+            border: 1px solid var(--border);
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr 1fr 1.5fr;
+            align-items: center;
+            transition: transform 0.2s;
         }
 
-        ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-thumb { background: var(--accent); border-radius: 10px; }
+        .trade-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+        }
 
+        .ticker { font-weight: 600; font-size: 1.1rem; }
+        .direction { font-size: 0.8rem; font-weight: 700; padding: 2px 8px; border-radius: 4px; display: inline-block; }
+        .buy { background: #dcfce7; color: #166534; }
+        .sell { background: #fee2e2; color: #991b1b; }
+
+        .time { font-size: 0.85rem; color: var(--text-muted); }
+        .pnl { font-weight: 700; font-size: 1.1rem; text-align: right; }
+        .reason { font-size: 0.85rem; color: var(--text-muted); font-style: italic; }
+
+        .no-trades {
+            text-align: center;
+            padding: 4rem;
+            color: var(--text-muted);
+        }
+
+        @media (max-width: 768px) {
+            .trade-card {
+                grid-template-columns: 1fr 1fr;
+                gap: 0.5rem;
+            }
+            .stats-grid { grid-template-columns: 1fr; }
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>ICT Singularity <span style="font-size: 0.5em; vertical-align: middle;">R&D DASHBOARD</span></h1>
-        
-        <div id="loading" style="text-align: center; color: var(--accent);">
-            Synthesizing Neural Data...
+        <header>
+            <div class="logo">SINGULARITY HFT</div>
+            <div class="time" id="current-time">09.04.2026</div>
+        </header>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-label">Bugünkü Toplam PnL</div>
+                <div class="stat-value" id="total-pnl">...</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Toplam İşlem</div>
+                <div class="stat-value" id="total-trades">...</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Win Rate</div>
+                <div class="stat-value" id="win-rate">...</div>
+            </div>
         </div>
 
-        <div id="experiments" class="stats-grid">
-            <!-- Experiments filled by JS -->
+        <h2 style="margin-bottom: 1rem; font-size: 1.25rem;">Bugünkü İşlemler (12:00'den beri)</h2>
+        <div class="trade-list" id="trade-list">
+            <!-- İşlemler buraya gelecek -->
         </div>
     </div>
 
     <script>
-        async function fetchExperiments() {
+        async function fetchTrades() {
             try {
-                const response = await fetch('/api/experiments');
+                const response = await fetch('/api/trades');
                 const data = await response.json();
-                const container = document.getElementById('experiments');
-                document.getElementById('loading').style.display = 'none';
                 
-                container.innerHTML = data.reverse().map(exp => `
-                    <div class="experiment-card">
-                        <div class="timestamp">${new Date(exp.timestamp).toLocaleString()}</div>
-                        <div class="performance">
-                            <div class="perf-item">
-                                <div style="font-size: 0.7rem; color: #888;">WIN RATE</div>
-                                <div class="perf-value win-rate">${exp.performance.win_rate}%</div>
-                            </div>
-                            <div class="perf-item">
-                                <div style="font-size: 0.7rem; color: #888;">RETURN</div>
-                                <div class="perf-value net-profit">${exp.performance.return > 0 ? '+' : ''}${exp.performance.return}</div>
-                            </div>
+                document.getElementById('total-pnl').innerText = `$${data.summary.total_pnl.toFixed(2)}`;
+                document.getElementById('total-pnl').className = 'stat-value ' + (data.summary.total_pnl >= 0 ? 'positive' : 'negative');
+                
+                document.getElementById('total-trades').innerText = data.summary.total_trades;
+                document.getElementById('win-rate').innerText = `%${data.summary.win_rate}`;
+
+                const list = document.getElementById('trade-list');
+                list.innerHTML = '';
+
+                if (data.trades.length === 0) {
+                    list.innerHTML = '<div class="no-trades">Bugün henüz işlem gerçekleşmedi.</div>';
+                    return;
+                }
+
+                data.trades.forEach(t => {
+                    const card = document.createElement('div');
+                    card.className = 'trade-card';
+                    card.innerHTML = `
+                        <div>
+                            <div class="ticker">${t.ticker}</div>
+                            <div class="time">${t.timestamp.split(' ')[1]}</div>
                         </div>
-                        <div class="analysis-box">
-                            <strong>AI AUDIT:</strong><br>
-                            ${exp.analysis.replace(/\n/g, '<br>')}
+                        <div>
+                            <span class="direction ${t.direction.toLowerCase()}">${t.direction == 'BUY' ? 'ALIM' : 'SATIM'}</span>
                         </div>
-                        <div class="knowledge-tags">
-                            ${exp.knowledge.map(k => `<span class="tag">${k}</span>`).join('')}
+                        <div>
+                            <div class="reason">${t.ai_reason || 'Strateji Sinyali'}</div>
                         </div>
-                    </div>
-                `).join('');
-            } catch (err) {
-                console.error(err);
+                        <div>
+                            <div style="font-size:0.8rem; color:#64748b">Fiyat: ${t.entry_price.toFixed(5)}</div>
+                        </div>
+                        <div class="pnl ${t.pnl >= 0 ? 'positive' : 'negative'}">
+                            ${t.pnl >= 0 ? '+' : ''}${t.pnl.toFixed(2)}$
+                        </div>
+                    `;
+                    list.appendChild(card);
+                });
+            } catch (error) {
+                console.error('Fetch error:', error);
             }
         }
 
-        fetchExperiments();
-        setInterval(fetchExperiments, 60000); // Reload every min
+        setInterval(fetchTrades, 10000);
+        fetchTrades();
     </script>
 </body>
 </html>

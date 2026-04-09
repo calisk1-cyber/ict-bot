@@ -5,7 +5,7 @@ import json
 from datetime import datetime, timezone
 import pandas_ta as ta
 from ict_utils import (
-    download_full_history, get_smc_bias_v11, apply_ict_v11_depth
+    download_full_history, get_smc_bias_v11, apply_ict_v12_depth
 )
 
 class AggressiveBacktesterV11:
@@ -42,7 +42,10 @@ class AggressiveBacktesterV11:
         )
 
         # 3. Strategy Enrichment (V11)
-        df_5m = apply_ict_v11_depth(df_5m)
+        try:
+            df_5m = apply_ict_v12_depth(df_5m)
+        except:
+            return
         
         # 4. Simulation
         active_trade = None
@@ -99,9 +102,9 @@ class AggressiveBacktesterV11:
             bias = row.get('HTF_Bias', 'NEUTRAL')
             
             # Entry Logic
-            if score >= self.threshold and "BULLISH" in bias and row['is_discount']:
+            if score >= self.threshold and "BULLISH" in bias and row.get('is_discount', True):
                 active_trade = self._open("BUY", row, ts, score)
-            elif score <= -self.threshold and "BEARISH" in bias and row['is_premium']:
+            elif score <= -self.threshold and "BEARISH" in bias and row.get('is_premium', True):
                 active_trade = self._open("SELL", row, ts, score)
 
     def _open(self, side, row, ts, score):
@@ -141,8 +144,5 @@ class AggressiveBacktesterV11:
 if __name__ == "__main__":
     for mode in ["CONSERVATIVE", "AGGRESSIVE"]:
         bt = AggressiveBacktesterV11(mode=mode)
-        bt.run("EUR_USD")
-        print(bt.report())
-        bt = AggressiveBacktesterV11(mode=mode)
-        bt.run("XAU_USD")
+        bt.run("EUR_USD", period="30d")
         print(bt.report())

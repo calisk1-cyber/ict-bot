@@ -160,6 +160,27 @@ def find_breaker_blocks(df):
     df['Breaker_Bull'] = (df['Low'] < low_20) & (df['Close'] > df['High'].shift(1).rolling(5).max())
     return df
 
+def find_order_blocks(df):
+    """
+    detects Institutional Order Blocks (OB)
+    Bullish OB: Last bearish candle before a strong bullish move (MSS)
+    Bearish OB: Last bullish candle before a strong bearish move (MSS)
+    """
+    df = df.copy()
+    if len(df) < 5: return df
+    
+    is_bull = df['Close'] > df['Open']
+    is_bear = df['Close'] < df['Open']
+    
+    # 1. Potential OB Levels
+    df['Bull_OB'] = np.where(is_bear.shift(1) & (df['Close'] > df['High'].shift(1)), df['Low'].shift(1), np.nan)
+    df['Bear_OB'] = np.where(is_bull.shift(1) & (df['Close'] < df['Low'].shift(1)), df['High'].shift(1), np.nan)
+    
+    df['Bull_OB'] = df['Bull_OB'].ffill()
+    df['Bear_OB'] = df['Bear_OB'].ffill()
+    
+    return df
+
 # --- UTILS ---
 
 def download_full_history(ticker, interval='5m', period='3d'):
@@ -480,6 +501,7 @@ def apply_ict_v12_depth(df):
     df = find_turtle_soup_v2(df)
     df = find_mss_v11(df)
     df = find_volume_imbalance(df)
+    df = find_order_blocks(df)
     
     # 2. Advanced Phase Logic
     df = detect_po3_v11(df)

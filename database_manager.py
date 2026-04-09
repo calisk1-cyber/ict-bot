@@ -25,6 +25,7 @@ def init_database():
             units INTEGER,
             pnl REAL DEFAULT 0.0,
             ai_decision TEXT,
+            ai_reason TEXT,
             red_flags TEXT,
             exit_price REAL,
             exit_time DATETIME
@@ -52,13 +53,13 @@ def log_trade(data):
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute("""
-        INSERT INTO trades (ticker, direction, signal_type, score, entry_price, sl, tp, status, units, ai_decision, red_flags)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO trades (ticker, direction, signal_type, score, entry_price, sl, tp, status, units, ai_decision, ai_reason, red_flags)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         data.get('ticker'), data.get('direction'), data.get('signal_type'), 
         data.get('score'), data.get('entry_price'), data.get('sl'), 
         data.get('tp'), data.get('status', 'OPEN'), data.get('units', 0),
-        data.get('ai_decision'), data.get('red_flags')
+        data.get('ai_decision', 'APPROVED'), data.get('ai_reason'), data.get('red_flags')
     ))
     trade_id = cursor.lastrowid
     conn.commit()

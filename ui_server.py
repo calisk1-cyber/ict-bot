@@ -1,6 +1,6 @@
 from flask import Flask, render_template, jsonify
 import sqlite3
-from datetime import datetime, timedelta
+from datetime import datetime, timezone
 import os
 from dotenv import load_dotenv
 from oandapyV20 import API
@@ -20,7 +20,7 @@ def get_real_oanda_data():
     """Oanda API'sinden tum acik ve bugunku kapali islemleri ceker."""
     all_real = []
     try:
-        # 1. ACIK ISLEMLER
+        # 1. ACIK ISLEMLER (LIVE)
         r_open = trades.TradesList(OANDA_ACCOUNT_ID)
         client.request(r_open)
         for t in r_open.response.get('trades', []):
@@ -31,35 +31,34 @@ def get_real_oanda_data():
                 "direction": "BUY" if int(t['currentUnits']) > 0 else "SELL",
                 "entry_price": float(t['price']),
                 "pnl": float(t['unrealizedPL']),
-                "status": "OPEN",
-                "ai_reason": "Canlı Pozisyon"
+                "status": "LIVE",
+                "ai_reason": "Aktif Sinyal"
             })
             
-        # 2. KAPALI ISLEMLER (Son 50 Transaction)
-        r_trans = trans.TransactionList(OANDA_ACCOUNT_ID)
-        client.request(r_trans)
-        last_id = int(r_trans.response.get('lastTransactionID', 0))
+        # 2. KAPALI ISLEMLER (TRANS)
+        r_list = trans.TransactionList(OANDA_ACCOUNT_ID)
+        client.request(r_list)
+        last_id = int(r_list.response.get('lastTransactionID', 0))
         
-        # Son id'den geriye dogru birkac tane bakalim (Pratik cozum)
-        r_since = trans.TransactionSinceID(OANDA_ACCOUNT_ID, params={"id": max(1, last_id - 50)})
+        # Son 100 transaction'a kadar bak (Işlem yoğunluğu için yeterli)
+        r_since = trans.TransactionsSinceID(OANDA_ACCOUNT_ID, params={"id": max(1, last_id - 100)})
         client.request(r_since)
         for tx in r_since.response.get('transactions', []):
             if tx['type'] == 'ORDER_FILL':
-                # Sadece kapama islemlerini (PnL uretenleri) alalim
                 pl = float(tx.get('pl', 0))
-                if pl != 0:
+                if pl != 0: # Sadece kar/zarar ureten kapama islemleri
                     all_real.append({
                         "id": f"tx_{tx['id']}",
                         "timestamp": tx['time'][:19].replace('T', ' '),
                         "ticker": tx['instrument'],
-                        "direction": "BUY" if int(tx.get('units', 0)) > 0 else "SELL",
+                        "direction": "SELL" if int(tx.get('units', 0)) > 0 else "BUY", # Kapatma yonu tersine cevrilir (Giris yonunu gostermek icin)
                         "entry_price": float(tx.get('price', 0)),
                         "pnl": pl,
                         "status": "CLOSED",
-                        "ai_reason": "Oanda Geçmişi"
+                        "ai_reason": "Kâr Al / Zarar Durdur"
                     })
     except Exception as e:
-        print(f"Oanda API Hatasi: {e}")
+        print(f"Oanda API Sync Hatasi: {e}")
         
     return all_real
 
@@ -69,16 +68,13 @@ def index():
 
 @app.route('/api/trades')
 def api_trades():
-    oanda_data = get_real_oanda_data()
+    final_list = get_real_oanda_data()
     
-    # Sort and filter today only (optional, filter for clarity)
-    today_str = datetime.now().strftime("%Y-%m-%d")
-    final_list = [t for t in oanda_data if t['timestamp'].startswith(today_str)]
+    # Bugunun tarihine gore filtrele
+    today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    final_list = [t for t in final_list if t['timestamp'].startswith(today_str)]
     
-    # If no real data for today, show dummy to avoid empty screen for UI demo
-    if not final_list:
-        final_list = [{"id": "d1", "timestamp": f"{today_str} 18:10:00", "ticker": "OANDA_YOK", "direction": "BUY", "entry_price": 0, "pnl": 0, "status": "REKLAM", "ai_reason": "Beklemede"}]
-
+    # Sort by timestamp
     final_list.sort(key=lambda x: x['timestamp'], reverse=True)
 
     summary = {

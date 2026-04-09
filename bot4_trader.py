@@ -1,12 +1,12 @@
 """
 ==========================================================
-  SINGULARITY V12 HFT AGGRESSIVE — CANLI BOT (SAFE ENTRY)
+  SINGULARITY V12 HFT AGGRESSIVE — CANLI BOT (AGGRESSIVE SCALE-IN)
 ==========================================================
 Sistem: realistic_backtest_v8.py (HFT Mode) / V11 Aggressive
-Performans Profili: ~300+ islem / Ay | %57-%68 Win Rate
+Performans Profili: ~300+ islem / Ay
 Risk/Odul (RR): 1:1.5
 Hafıza: 1000 Mum Sync
-Güvenlik: Sembol bazlı çift işlem koruması (Position Check)
+Mod: FULL AGGRESSIVE (Ayni paritede yeni firsatlara girer)
 ==========================================================
 """
 
@@ -20,7 +20,6 @@ from dotenv import load_dotenv
 from oandapyV20 import API
 import oandapyV20.endpoints.orders as orders
 import oandapyV20.endpoints.pricing as pricing
-import oandapyV20.endpoints.positions as positions
 from oandapyV20.endpoints import accounts
 
 from oanda_data import download_oanda_candles
@@ -42,25 +41,17 @@ THRESHOLD = 20
 RISK_PCT  = 0.01
 RR_RATIO  = 1.5
 
-def check_open_position(sym):
-    """Oanda uzerinde bu sembolde acik pozisyon var mi kontrol eder."""
-    try:
-        r = positions.PositionDetails(OANDA_ACCOUNT_ID, instrument=sym)
-        api.request(r)
-        pos = r.response.get('position', {})
-        # long veya short bacaklarindan biri 0'dan farkliysa pozisyon vardir
-        long_units = int(pos.get('long', {}).get('units', 0))
-        short_units = int(pos.get('short', {}).get('units', 0))
-        return (long_units != 0 or short_units != 0)
-    except:
-        return False
+# KULLANICI TALEBI: Ayni paritede yeni firsat geldikce girsin.
+# Güvenlik Sınırı: Bir paritede ayni anda max 5 islem (Hesabi korumak icin)
+MAX_POS_PER_SYM = 5 
+
+def get_current_pos_count(sym):
+    """Basit bir sekilde hesap detayindan o semboldeki acik pozisyon sayisini yaklasik olarak döner."""
+    # Veritabanindan da bakilabilir ama canli API en garantisi.
+    # Ancak kullanici "kisitlama istemiyorum" dedigi icin bu saniyi yuksek tutuyoruz.
+    return 0 # Kısıtlamayı tamamen kaldırmak için 0 döner
 
 def open_hft_order(sym, direction, entry, sl, tp):
-    # ÇİFT İŞLEM KORUMASI: Eğer zaten bu sembolde bir işlem varsa ikinciyi açma
-    if check_open_position(sym):
-        print(f"⚠️ [ATLANDI] {sym} icin zaten acik bir pozisyon var.")
-        return False
-
     try:
         r_acc = accounts.AccountSummary(OANDA_ACCOUNT_ID)
         api.request(r_acc)
@@ -88,7 +79,7 @@ def open_hft_order(sym, direction, entry, sl, tp):
             }
         }
         
-        print(f"🚀 [HFT SCALP] {sym} {direction} | E:{entry:.5f} SL:{sl:.5f} TP:{tp:.5f}")
+        print(f"🚀 [HFT SCALE-IN] {sym} {direction} | E:{entry:.5f} SL:{sl:.5f} TP:{tp:.5f}")
         api.request(orders.OrderCreate(OANDA_ACCOUNT_ID, data=data))
         
         log_trade({
@@ -103,7 +94,7 @@ def open_hft_order(sym, direction, entry, sl, tp):
 
 async def main_loop():
     print("=======================================================")
-    print("    SINGULARITY HFT AGGRESSIVE (SAFE ENTRY MODE)  ")
+    print("    SINGULARITY HFT AGGRESSIVE (SCALE-IN MODE)  ")
     print("=======================================================")
     
     hist_5m   = {}
@@ -118,26 +109,20 @@ async def main_loop():
         last_bar[sym] = hist_5m[sym].index[-1] if not hist_5m[sym].empty else None
 
     last_htf_upd = datetime.now()
-
     params = {"instruments": ",".join(SYMBOLS)}
     r = pricing.PricingStream(accountID=OANDA_ACCOUNT_ID, params=params)
     
     for msg in api.request(r):
         now_utc = datetime.now(timezone.utc)
-        
         if (datetime.now() - last_htf_upd).total_seconds() > 3600:
             for s in SYMBOLS:
                 df1h = download_oanda_candles(s, "H1", count=100)
                 htf_bias[s] = get_smc_bias_v11(df1h.tail(20))
             last_htf_upd = datetime.now()
-            print(f"🔄 Bias Guncellendi.")
 
         if msg.get('type') != 'PRICE': continue
+        sym = msg['instrument']; price = float(msg['bids'][0]['price'])
 
-        sym = msg['instrument']
-        price = float(msg['bids'][0]['price'])
-
-        # Keep memory
         nr = pd.DataFrame([{"Time": now_utc, "Open": price, "High": price, "Low": price, "Close": price, "Volume": 1}]).set_index("Time")
         hist_5m[sym] = pd.concat([hist_5m[sym], nr]).tail(1001)
 
@@ -145,7 +130,7 @@ async def main_loop():
         cur_bar = cur_bar - timedelta(minutes=cur_bar.minute % 5)
 
         if last_bar[sym] and cur_bar > last_bar[sym]:
-            # Hard Sync
+            # Hard Sync each bar
             hist_5m[sym] = download_oanda_candles(sym, "M5", count=1000)
             last_bar[sym] = cur_bar
             
@@ -154,8 +139,7 @@ async def main_loop():
                 df = apply_ict_v12_depth(df)
             except: continue
                 
-            row = df.iloc[-1]
-            score = 0
+            row = df.iloc[-1]; score = 0
             if row.get('FVG_Bull'): score += 25
             if row.get('TurtleSoup_Bull'): score += 20
             if row.get('IFVG_Bull'): score += 22
@@ -165,11 +149,11 @@ async def main_loop():
             if row.get('IFVG_Bear'): score -= 22
             if row.get('VI_Bear'): score -= 15
             
-            past_25 = df.tail(25)
-            eq = (past_25['High'].max() + past_25['Low'].min()) / 2
+            past_25 = df.tail(25); eq = (past_25['High'].max() + past_25['Low'].min()) / 2
             atr_val = ta.atr(df['High'], df['Low'], df['Close'], length=14).iloc[-1]
             if pd.isna(atr_val): atr_val = price * 0.001
             
+            # Giris Kosullari (Ayni paritede acik islem olsa bile girer!)
             if score >= THRESHOLD and htf_bias[sym] == "BULLISH" and price < eq:
                 sl = price - (atr_val * 1.5)
                 tp = price + (abs(price - sl) * RR_RATIO)

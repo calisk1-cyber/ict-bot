@@ -132,9 +132,17 @@ class FullYearInstitutionalBacktester:
 
     def close_trade(self, trade, close_p, reason):
         pnl_raw = (close_p - trade['entry']) * trade['units'] if trade['side'] == "BUY" else (trade['entry'] - close_p) * trade['units']
+        
+        # --- CURRENCY CONVERSION (FIXED) ---
+        # For USD_JPY, PnL is in JPY and must be converted to USD (Base Currency)
+        if "JPY" in trade['symbol']:
+            pnl_usd = pnl_raw / close_p
+        else:
+            pnl_usd = pnl_raw
+            
         comm = (abs(trade['units']) / 100000.0) * self.COMMISSION_PER_LOT
-        self.balance += (pnl_raw - comm)
-        self.trades.append({"pnl": pnl_raw - comm, "reason": reason})
+        self.balance += (pnl_usd - comm)
+        self.trades.append({"symbol": trade['symbol'], "pnl": pnl_usd - comm, "reason": reason})
 
     def report(self):
         df_trades = pd.DataFrame(self.trades)

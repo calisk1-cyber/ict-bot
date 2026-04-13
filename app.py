@@ -210,13 +210,20 @@ def open_order(ticker, direction, price, score):
         pip = 0.0001 if "USD" in ticker else 0.01
         if "XAU" in ticker: pip = 0.1
         
-        sl_dist = 12 * pip
+        sl_dist = 25 * pip # Scalp yerine Intraday bazli (25 pips)
         sl = price - sl_dist if direction == "BUY" else price + sl_dist
-        tp = price + (sl_dist * 1.8) if direction == "BUY" else price - (sl_dist * 1.8)
+        tp = price + (sl_dist * 2.5) if direction == "BUY" else price - (sl_dist * 2.5) # R/R 1:2.5
         
-        # 3. Position Sizing (Fixed formula for Oanda)
-        # Risk = Units * sl_dist -> Units = Risk / sl_dist
-        units = int(risk_amount / sl_dist)
+        # --- INSTITUTIONAL UNIT HAKKEDİŞ (FIXED) ---
+        if "XAU" in ticker:
+            units = int(risk_amount / sl_dist)
+        elif "JPY" in ticker:
+            # USD/JPY: Units = Risk / (Dist / Entry)
+            units = int(risk_amount / (sl_dist / price))
+        else:
+            # EUR_USD etc: Units = Risk / Dist
+            units = int(risk_amount / sl_dist)
+            
         if direction == "SELL": units = -units
         
         # Precision handling (JPY pairs use 3 decimals, others 5)

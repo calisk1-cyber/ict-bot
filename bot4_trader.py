@@ -54,12 +54,15 @@ def open_hft_order(sym, direction, entry, sl, tp):
         sl_pts = abs(entry - sl)
         if sl_pts == 0: return False
         
+        # --- INSTITUTIONAL UNIT HAKKEDİŞ (FIXED) ---
         if "XAU" in sym:
-            units = int(risk_amount / sl_pts / 100)
-            if units < 1: units = 1
+            # 1 Unit Gold = 1 Ounce. Pip = 0.10.
+            units = int(risk_amount / sl_pts)
         elif "JPY" in sym:
-            units = int(risk_amount / sl_pts * 100)
+            # USD/JPY: Units = Risk / (Dist / Entry)
+            units = int(risk_amount / (sl_pts / entry))
         else:
+            # EUR_USD, GBP_USD etc: Units = Risk / Dist
             units = int(risk_amount / sl_pts)
             
         if direction == "SELL": units = -units
@@ -149,15 +152,18 @@ async def main_loop():
             atr_val = ta.atr(df['High'], df['Low'], df['Close'], length=14).iloc[-1]
             if pd.isna(atr_val): atr_val = price * 0.001
             
-            # Giris Kosullari (EKİM 2025 MODU: TAM AGRESİF)
+            # Giris Kosullari (V18 ULTIMATE: INSTITUTIONAL EXPECTANCY)
+            # Scalping yerine Intraday mesafeler (ATR x 2.5) kullanarak spread maliyetini minimize ediyoruz.
             if score >= THRESHOLD and htf_bias[sym] == "BULLISH" and price < eq:
-                sl = price - (atr_val * 1.5)
-                tp = price + (abs(price - sl) * RR_RATIO)
-                open_hft_order(sym, "BUY", price, sl, tp)
+                sl = price - (atr_val * 2.5) # Daha genis guvenlik marji
+                tp = price + (abs(price - sl) * 2.5) # Yuksek RR (1:2.5) maliyetleri yener
+                if open_hft_order(sym, "BUY", price, sl, tp):
+                    last_bar[sym] = cur_bar 
             elif score <= -THRESHOLD and htf_bias[sym] == "BEARISH" and price > eq:
-                sl = price + (atr_val * 1.5)
-                tp = price - (abs(price - sl) * RR_RATIO)
-                open_hft_order(sym, "SELL", price, sl, tp)
+                sl = price + (atr_val * 2.5)
+                tp = price - (abs(price - sl) * 2.5)
+                if open_hft_order(sym, "SELL", price, sl, tp):
+                    last_bar[sym] = cur_bar
                 
         await asyncio.sleep(0.01)
 

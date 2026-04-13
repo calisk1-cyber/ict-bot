@@ -67,8 +67,14 @@ def open_hft_order(sym, direction, entry, sl, tp):
             
         if direction == "SELL": units = -units
 
-        # Precision handling (JPY pairs use 3 decimals, others 5)
-        precision = 3 if "JPY" in sym else 5
+        # Precision handling (JPY/THB/HUF/XAU use 3 decimals, others 5)
+        precision_map = {
+            'EUR_USD': 5, 'NZD_USD': 5, 'GBP_USD': 5, 'XAU_USD': 3,
+            'EUR_HUF': 3, 'AUD_NZD': 5, 'TRY_JPY': 3, 'GBP_CAD': 5,
+            'AUD_CAD': 5, 'EUR_CAD': 5, 'GBP_CHF': 5, 'CAD_HKD': 5,
+            'USD_THB': 3, 'AUD_HKD': 5, 'EUR_TRY': 5, 'USD_JPY': 3, 'USD_CAD': 5
+        }
+        precision = precision_map.get(sym, 5)
         
         data = {
             "order": {

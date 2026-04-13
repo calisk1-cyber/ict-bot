@@ -1,44 +1,6 @@
 module.exports = {
   apps: [
-    {
-      name: "bot1-backtester",
-      script: "bot1_backtester.py",
-      interpreter: "python3",
-      cwd: "./",
-      env_file: ".env",
-      out_file: "/root/logs/bot1-out.log",
-      error_file: "/root/logs/bot1-err.log",
-      autorestart: true,
-      restart_delay: 15000,
-      max_restarts: 20,
-      watch: false
-    },
-    {
-      name: "bot2-hunter",
-      script: "bot2_hunter.py",
-      interpreter: "python3",
-      cwd: "./",
-      env_file: ".env",
-      out_file: "/root/logs/bot2-out.log",
-      error_file: "/root/logs/bot2-err.log",
-      autorestart: true,
-      restart_delay: 15000,
-      max_restarts: 20,
-      watch: false
-    },
-    {
-      name: "bot3-evaluator",
-      script: "bot3_evaluator.py",
-      interpreter: "python3",
-      cwd: "./",
-      env_file: ".env",
-      out_file: "/root/logs/bot3-out.log",
-      error_file: "/root/logs/bot3-err.log",
-      autorestart: true,
-      restart_delay: 15000,
-      max_restarts: 20,
-      watch: false
-    },
+    // bot1, bot2, bot3 ve bot5 devre dışı bırakıldı (Kaynak tasarrufu için)
     {
       name: "bot4-trader",
       script: "bot4_trader.py",
@@ -49,7 +11,7 @@ module.exports = {
       error_file: "/root/logs/bot4-err.log",
       autorestart: true,
       restart_delay: 15000,
-      max_restarts: 20,
+      max_memory_restart: "400M",
       watch: false
     },
     {
@@ -62,7 +24,7 @@ module.exports = {
       error_file: "/root/logs/api-err.log",
       autorestart: true,
       restart_delay: 15000,
-      max_restarts: 20,
+      max_memory_restart: "350M",
       watch: false
     },
     {
@@ -75,24 +37,11 @@ module.exports = {
       error_file: "/root/logs/proxy-err.log",
       autorestart: true,
       restart_delay: 5000,
-      max_restarts: 20,
+      max_memory_restart: "100M",
       watch: false,
       env: {
         PORT: 3000
       }
-    },
-    {
-      name: "bot5-analyst",
-      script: "bot5_analyst.py",
-      interpreter: "python3",
-      cwd: "./",
-      env_file: ".env",
-      out_file: "/root/logs/bot5-out.log",
-      error_file: "/root/logs/bot5-err.log",
-      autorestart: true,
-      restart_delay: 15000,
-      max_restarts: 20,
-      watch: false
     }
   ]
 };

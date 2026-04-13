@@ -219,14 +219,17 @@ def open_order(ticker, direction, price, score):
         units = int(risk_amount / sl_dist)
         if direction == "SELL": units = -units
         
+        # Precision handling (JPY pairs use 3 decimals, others 5)
+        precision = 3 if "JPY" in ticker else 5
+
         data = {
             "order": {
                 "instrument": ticker,
                 "units": str(units),
                 "type": "MARKET",
                 "positionFill": "DEFAULT",
-                "stopLossOnFill": {"price": f"{sl:.5f}"},
-                "takeProfitOnFill": {"price": f"{tp:.5f}"}
+                "stopLossOnFill": {"price": f"{sl:.{precision}f}"},
+                "takeProfitOnFill": {"price": f"{tp:.{precision}f}"}
             }
         }
         

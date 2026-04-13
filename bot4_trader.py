@@ -41,15 +41,8 @@ THRESHOLD = 20
 RISK_PCT  = 0.01
 RR_RATIO  = 1.5
 
-# KULLANICI TALEBI: Ayni paritede yeni firsat geldikce girsin.
-# Güvenlik Sınırı: Bir paritede ayni anda max 5 islem (Hesabi korumak icin)
-MAX_POS_PER_SYM = 5 
-
-def get_current_pos_count(sym):
-    """Basit bir sekilde hesap detayindan o semboldeki acik pozisyon sayisini yaklasik olarak döner."""
-    # Veritabanindan da bakilabilir ama canli API en garantisi.
-    # Ancak kullanici "kisitlama istemiyorum" dedigi icin bu saniyi yuksek tutuyoruz.
-    return 0 # Kısıtlamayı tamamen kaldırmak için 0 döner
+# --- 'OCTOBER 2025' MODE: FULL AGGRESSIVE (No Limits) ---
+# Sistem, arka arkaya kayıpları göze alarak trendi sonuna kadar sömürür.
 
 def open_hft_order(sym, direction, entry, sl, tp):
     try:
@@ -71,11 +64,14 @@ def open_hft_order(sym, direction, entry, sl, tp):
             
         if direction == "SELL": units = -units
 
+        # Precision handling (JPY pairs use 3 decimals, others 5)
+        precision = 3 if "JPY" in sym else 5
+        
         data = {
             "order": {
                 "instrument": sym, "units": str(units), "type": "MARKET",
-                "stopLossOnFill": {"price": f"{sl:.5f}"},
-                "takeProfitOnFill": {"price": f"{tp:.5f}"}
+                "stopLossOnFill": {"price": f"{sl:.{precision}f}"},
+                "takeProfitOnFill": {"price": f"{tp:.{precision}f}"}
             }
         }
         
@@ -153,7 +149,7 @@ async def main_loop():
             atr_val = ta.atr(df['High'], df['Low'], df['Close'], length=14).iloc[-1]
             if pd.isna(atr_val): atr_val = price * 0.001
             
-            # Giris Kosullari (Ayni paritede acik islem olsa bile girer!)
+            # Giris Kosullari (EKİM 2025 MODU: TAM AGRESİF)
             if score >= THRESHOLD and htf_bias[sym] == "BULLISH" and price < eq:
                 sl = price - (atr_val * 1.5)
                 tp = price + (abs(price - sl) * RR_RATIO)

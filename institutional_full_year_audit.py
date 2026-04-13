@@ -56,14 +56,24 @@ class FullYearInstitutionalBacktester:
             print(f"  Processing {len(df)} candles...")
             df = apply_ict_v18_omniscient(df)
             
-            # Fetch H1 Bias for the period (Vectorized calculation)
+            # Fetch H1 for correct Bias alignment
+            print(f"  Fetching H1 data for Precise Bias...")
             df_h1 = download_oanda_candles(ticker, "H1", from_time=f"{start_date}T00:00:00Z", to_time=f"{end_date}T00:00:00Z")
-            print(f"  Analysing HTF Bias...")
-            # Simple bias pre-calc for the audit
+            
+            # Map H1 Bias to M5 rows (Aligning to the latest available H1 candle)
+            print(f"  Mapping HTF Bias to M5 timeframe...")
             df['HTF_Bias'] = "NEUTRAL"
             if not df_h1.empty:
-                # Mocking a fast bias assign: In a real run, you'd align indices
-                df['HTF_Bias'] = "BULLISH" # Simplified for demo speed, usually you use get_smc_bias_v11 per window
+                # Calculate bias for each H1 candle
+                h1_biases = []
+                for j in range(len(df_h1)):
+                    window = df_h1.iloc[max(0, j-20):j+1]
+                    h1_biases.append(get_smc_bias_v11(window))
+                df_h1['calculated_bias'] = h1_biases
+                
+                # Merge M5 with H1 bias
+                df = pd.merge_asof(df.sort_index(), df_h1[['calculated_bias']].sort_index(), left_index=True, right_index=True, direction='backward')
+                df.rename(columns={'calculated_bias': 'HTF_Bias'}, inplace=True)
             
             active_trade = None
             spread_points = self.SPREADS.get(ticker, 0.0002)

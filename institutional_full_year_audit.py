@@ -94,6 +94,7 @@ class FullYearInstitutionalBacktester:
                 # Signal Detection
                 if not row.get('is_algo_window'): continue
                 
+                bias = row.get('HTF_Bias', 'NEUTRAL')
                 is_bull = row.get('CISD_Bull', False) and bias == "BULLISH"
                 is_bear = row.get('CISD_Bear', False) and bias == "BEARISH"
                 

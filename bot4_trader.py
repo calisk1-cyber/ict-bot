@@ -35,7 +35,7 @@ OANDA_ACCOUNT_ID = os.getenv("OANDA_ACCOUNT_ID")
 OANDA_ENV        = os.getenv("OANDA_ENV", "practice")
 
 api = API(access_token=OANDA_API_KEY, environment=OANDA_ENV)
-SYMBOLS = ["EUR_USD", "GBP_USD", "XAU_USD", "USD_JPY", "USD_CAD"]
+SYMBOLS = ["EUR_USD", "NZD_USD", "GBP_USD", "XAU_USD", "EUR_HUF", "AUD_NZD", "TRY_JPY", "GBP_CAD", "AUD_CAD", "EUR_CAD", "GBP_CHF", "CAD_HKD", "USD_THB", "AUD_HKD", "EUR_TRY"]
 
 THRESHOLD = 20
 RISK_PCT  = 0.01
@@ -103,8 +103,8 @@ async def main_loop():
     for sym in SYMBOLS:
         print(f"  Senkronize ediliyor: {sym}...")
         hist_5m[sym] = download_oanda_candles(sym, "M5", count=1000)
-        df1h = download_oanda_candles(sym, "H1", count=100)
-        htf_bias[sym] = get_smc_bias_v11(df1h.tail(20)) if not df1h.empty else "NEUTRAL"
+        dfh4 = download_oanda_candles(sym, "H4", count=100)
+        htf_bias[sym] = get_smc_bias_v11(dfh4.tail(20)) if not dfh4.empty else "NEUTRAL"
         last_bar[sym] = hist_5m[sym].index[-1] if not hist_5m[sym].empty else None
 
     last_htf_upd = datetime.now()
@@ -113,10 +113,10 @@ async def main_loop():
     
     for msg in api.request(r):
         now_utc = datetime.now(timezone.utc)
-        if (datetime.now() - last_htf_upd).total_seconds() > 3600:
+        if (datetime.now() - last_htf_upd).total_seconds() > 14400: # 4 Hours
             for s in SYMBOLS:
-                df1h = download_oanda_candles(s, "H1", count=100)
-                htf_bias[s] = get_smc_bias_v11(df1h.tail(20))
+                dfh4 = download_oanda_candles(s, "H4", count=100)
+                htf_bias[s] = get_smc_bias_v11(dfh4.tail(20))
             last_htf_upd = datetime.now()
 
         if msg.get('type') != 'PRICE': continue

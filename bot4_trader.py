@@ -39,7 +39,7 @@ SYMBOLS = ["EUR_USD", "NZD_USD", "GBP_USD", "XAU_USD", "EUR_HUF", "AUD_NZD", "TR
 
 THRESHOLD = 20
 RISK_PCT  = 0.01
-RR_RATIO  = 1.5
+RR_RATIO  = 2.5
 
 # --- 'OCTOBER 2025' MODE: FULL AGGRESSIVE (No Limits) ---
 # Sistem, arka arkaya kayıpları göze alarak trendi sonuna kadar sömürür.
@@ -152,16 +152,17 @@ async def main_loop():
             atr_val = ta.atr(df['High'], df['Low'], df['Close'], length=14).iloc[-1]
             if pd.isna(atr_val): atr_val = price * 0.001
             
-            # Giris Kosullari (V18 ULTIMATE: INSTITUTIONAL EXPECTANCY)
-            # Scalping yerine Intraday mesafeler (ATR x 2.5) kullanarak spread maliyetini minimize ediyoruz.
+            pip = 0.1 if "XAU" in sym else (0.01 if "JPY" in sym or "HUF" in sym else 0.0001)
+            
+            # Giris Kosullari (V18 GOLDEN: 100% Backtest Parity)
             if score >= THRESHOLD and htf_bias[sym] == "BULLISH" and price < eq:
-                sl = price - (atr_val * 2.5) # Daha genis guvenlik marji
-                tp = price + (abs(price - sl) * 2.5) # Yuksek RR (1:2.5) maliyetleri yener
+                sl = price - (25 * pip)
+                tp = price + (25 * pip * RR_RATIO)
                 if open_hft_order(sym, "BUY", price, sl, tp):
                     last_bar[sym] = cur_bar 
             elif score <= -THRESHOLD and htf_bias[sym] == "BEARISH" and price > eq:
-                sl = price + (atr_val * 2.5)
-                tp = price - (abs(price - sl) * 2.5)
+                sl = price + (25 * pip)
+                tp = price - (25 * pip * RR_RATIO)
                 if open_hft_order(sym, "SELL", price, sl, tp):
                     last_bar[sym] = cur_bar
                 

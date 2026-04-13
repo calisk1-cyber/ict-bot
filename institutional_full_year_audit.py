@@ -62,7 +62,6 @@ class FullYearInstitutionalBacktester:
             
             # Map H1 Bias to M5 rows (Aligning to the latest available H1 candle)
             print(f"  Mapping HTF Bias to M5 timeframe...")
-            df['HTF_Bias'] = "NEUTRAL"
             if not df_h1.empty:
                 # Calculate bias for each H1 candle
                 h1_biases = []
@@ -72,8 +71,17 @@ class FullYearInstitutionalBacktester:
                 df_h1['calculated_bias'] = h1_biases
                 
                 # Merge M5 with H1 bias
-                df = pd.merge_asof(df.sort_index(), df_h1[['calculated_bias']].sort_index(), left_index=True, right_index=True, direction='backward')
+                df = pd.merge_asof(
+                    df.sort_index(), 
+                    df_h1[['calculated_bias']].sort_index(), 
+                    left_index=True, 
+                    right_index=True, 
+                    direction='backward'
+                )
                 df.rename(columns={'calculated_bias': 'HTF_Bias'}, inplace=True)
+                df['HTF_Bias'] = df['HTF_Bias'].fillna("NEUTRAL")
+            else:
+                df['HTF_Bias'] = "NEUTRAL"
             
             active_trade = None
             spread_points = self.SPREADS.get(ticker, 0.0002)

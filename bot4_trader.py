@@ -20,7 +20,7 @@ from dotenv import load_dotenv
 from oandapyV20 import API
 import oandapyV20.endpoints.orders as orders
 import oandapyV20.endpoints.pricing as pricing
-from oandapyV20.endpoints import accounts
+from oandapyV20.endpoints import accounts, trades
 
 from oanda_data import download_oanda_candles
 from ict_utils import apply_ict_v12_depth, get_smc_bias_v11
@@ -84,9 +84,30 @@ def open_hft_order(sym, direction, entry, sl, tp):
             }
         }
         
-        print(f"🚀 [HFT SCALE-IN] {sym} {direction} | E:{entry:.5f} SL:{sl:.5f} TP:{tp:.5f}")
-        api.request(orders.OrderCreate(OANDA_ACCOUNT_ID, data=data))
+        print(f"🚀 [HFT ORDER] {sym} {direction} | E:{entry:.5f} SL:{sl:.5f} TP:{tp:.5f}")
+        order_resp = api.request(orders.OrderCreate(OANDA_ACCOUNT_ID, data=data))
         
+        # --- VERIFICATION & FALLBACK ---
+        fill_data = order_resp.get('orderFillTransaction', {})
+        trade_id = fill_data.get('tradeOpened', {}).get('tradeID')
+        
+        if trade_id:
+            sl_created = any(x in order_resp for x in ['stopLossOrderFillTransaction', 'stopLossOrderCreated'])
+            tp_created = any(x in order_resp for x in ['takeProfitOrderFillTransaction', 'takeProfitOrderCreated'])
+            
+            if not sl_created or not tp_created:
+                print(f"⚠️  [ATTACHMENT FAILED] Trade {trade_id} missing SL/TP. Retrying fallback...")
+                fb_data = {}
+                if not sl_created: fb_data["stopLoss"] = {"price": f"{sl:.{precision}f}", "timeInForce": "GTC"}
+                if not tp_created: fb_data["takeProfit"] = {"price": f"{tp:.{precision}f}", "timeInForce": "GTC"}
+                
+                try:
+                    fb_req = trades.TradeOrders(accountID=OANDA_ACCOUNT_ID, tradeID=trade_id, data=fb_data)
+                    api.request(fb_req)
+                    print(f"✅ [RECOVERY SUCCESS] SL/TP attached to Trade {trade_id}")
+                except Exception as fb_err:
+                    print(f"❌ [RECOVERY FAILED] Trade {trade_id}: {fb_err}")
+
         log_trade({
             "ticker": sym, "direction": direction, "entry_price": entry,
             "sl": sl, "tp": tp, "units": units,

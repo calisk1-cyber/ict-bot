@@ -44,9 +44,25 @@ def init_database():
             sharpe REAL
         )
     """)
+    # --- MIGRATION LOGIC (Add missing columns if table exists) ---
+    columns_to_add = [
+        ("ai_decision", "TEXT"),
+        ("ai_reason", "TEXT"),
+        ("red_flags", "TEXT"),
+        ("score", "INTEGER"),
+        ("exit_price", "REAL"),
+        ("exit_time", "DATETIME")
+    ]
+    
+    for col_name, col_type in columns_to_add:
+        try:
+            cursor.execute(f"ALTER TABLE trades ADD COLUMN {col_name} {col_type}")
+        except sqlite3.OperationalError:
+            pass # Column already exists
+            
     conn.commit()
     conn.close()
-    print("--- SQLITE DATABASE READY ---")
+    print("--- SQLITE DATABASE READY & MIGRATED ---")
 
 def log_trade(data):
     """Inserts a new trade into the trades table."""

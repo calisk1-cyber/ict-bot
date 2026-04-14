@@ -21,6 +21,7 @@ from oandapyV20 import API
 import oandapyV20.endpoints.orders as orders
 import oandapyV20.endpoints.pricing as pricing
 from oandapyV20.endpoints import accounts, trades
+from oandapyV20.contrib.requests import StopLossOrderRequest, TakeProfitOrderRequest
 
 from oanda_data import download_oanda_candles
 from ict_utils import apply_ict_v12_depth, get_smc_bias_v11
@@ -97,13 +98,13 @@ def open_hft_order(sym, direction, entry, sl, tp):
             
             if not sl_created or not tp_created:
                 print(f"⚠️  [ATTACHMENT FAILED] Trade {trade_id} missing SL/TP. Retrying fallback...")
-                fb_data = {}
-                if not sl_created: fb_data["stopLoss"] = {"price": f"{sl:.{precision}f}", "timeInForce": "GTC"}
-                if not tp_created: fb_data["takeProfit"] = {"price": f"{tp:.{precision}f}", "timeInForce": "GTC"}
-                
                 try:
-                    fb_req = trades.TradeOrders(accountID=OANDA_ACCOUNT_ID, tradeID=trade_id, data=fb_data)
-                    api.request(fb_req)
+                    if not sl_created:
+                        sl_req = StopLossOrderRequest(tradeID=trade_id, price=f"{sl:.{precision}f}")
+                        api.request(orders.OrderCreate(OANDA_ACCOUNT_ID, data=sl_req.data))
+                    if not tp_created:
+                        tp_req = TakeProfitOrderRequest(tradeID=trade_id, price=f"{tp:.{precision}f}")
+                        api.request(orders.OrderCreate(OANDA_ACCOUNT_ID, data=tp_req.data))
                     print(f"✅ [RECOVERY SUCCESS] SL/TP attached to Trade {trade_id}")
                 except Exception as fb_err:
                     print(f"❌ [RECOVERY FAILED] Trade {trade_id}: {fb_err}")
@@ -215,6 +216,8 @@ async def main_loop():
         print(f"  Stream loop hatası: {e}")
 
 if __name__ == "__main__":
+    from database_manager import init_database
+    init_database()
     while True:
         try:
             asyncio.run(main_loop())

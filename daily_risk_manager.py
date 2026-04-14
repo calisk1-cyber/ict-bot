@@ -26,7 +26,7 @@ class DailyRiskManager:
         # --- SABIT LIMITLER ---
         self.DAILY_LOSS_LIMIT    = -0.02   # -%2
         self.HARD_STOP           = -0.01   # -%1'de risk yariya dus
-        self.MAX_DAILY_TRADES    = 6
+        self.MAX_DAILY_TRADES    = 250
         self.MAX_CONSECUTIVE_L   = 3       # 3 ust uste kayip -> dur
         self.MIN_RR              = 2.0     # minimum 1:2
         self.TARGET_RR           = 3.0     # hedef 1:3

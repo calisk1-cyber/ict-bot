@@ -190,22 +190,6 @@ async def main_loop():
                     
                 row = df.iloc[-1]
                 score = 0
-                # ... scoring logic ...
-                # (I'll keep the existing scoring but add a print)
-                if row.get('FVG_Bull'): score += 25
-                if row.get('TurtleSoup_Bull'): score += 20
-                if row.get('IFVG_Bull'): score += 22
-                if row.get('VI_Bull'): score += 15
-                if row.get('FVG_Bear'): score -= 25
-                if row.get('TurtleSoup_Bear'): score -= 20
-                if row.get('IFVG_Bear'): score -= 22
-                if row.get('VI_Bear'): score -= 15
-                
-                # DIAGNOSTIC PULSE: Show user the highest scoring signal
-                if abs(score) >= 10:
-                    print(f"  [SCAN] {sym}: Score={score:+}, Bias={htf_bias.get(sym, 'NEUTRAL')}")
-                elif sym == SYMBOLS[-1]:
-                    print(f"--- [HEARTBEAT] {now_utc.strftime('%H:%M:%S')} | Aktif Tarama Yapiliyor (15 Parite) ---")
                 
                 past_25 = df.tail(25)
                 eq = (past_25['High'].max() + past_25['Low'].min()) / 2

@@ -35,7 +35,7 @@ OANDA_ACCOUNT_ID = os.getenv("OANDA_ACCOUNT_ID")
 OANDA_ENV        = os.getenv("OANDA_ENV", "practice")
 
 api = API(access_token=OANDA_API_KEY, environment=OANDA_ENV)
-SYMBOLS = ["EUR_USD", "GBP_USD", "XAU_USD"]
+SYMBOLS = ["EUR_USD", "NZD_USD", "GBP_USD", "XAU_USD", "EUR_HUF", "AUD_NZD", "TRY_JPY", "GBP_CAD", "AUD_CAD", "EUR_CAD", "GBP_CHF", "CAD_HKD", "USD_THB", "AUD_HKD", "EUR_TRY"]
 
 THRESHOLD = 20
 RISK_PCT  = 0.005
@@ -117,9 +117,23 @@ async def main_loop():
     params = {"instruments": ",".join(SYMBOLS)}
     r = pricing.PricingStream(accountID=OANDA_ACCOUNT_ID, params=params)
     
+    print(f"  Hesap dogrulaniyor: {OANDA_ACCOUNT_ID}...")
+    try:
+        acc_req = accounts.AccountDetails(accountID=OANDA_ACCOUNT_ID)
+        api.request(acc_req)
+        print("    Hesap dogrulandi.")
+    except Exception as acc_err:
+        print(f"    HESAP HATASI: {acc_err}")
+        return
+
     print(f"  Stream baslatiliyor: {params['instruments']}")
     try:
-        for msg in api.request(r):
+        stream_request = api.request(r)
+        if hasattr(stream_request, 'status_code') and stream_request.status_code >= 400:
+            print(f"    STREAM REDDEDILDI: HTTP {stream_request.status_code} - {stream_request.response}")
+            return
+
+        for msg in stream_request:
             now_utc = datetime.now(timezone.utc)
             if msg.get('type') == 'HEARTBEAT':
                 continue

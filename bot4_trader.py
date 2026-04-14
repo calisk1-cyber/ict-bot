@@ -35,7 +35,7 @@ OANDA_ACCOUNT_ID = os.getenv("OANDA_ACCOUNT_ID")
 OANDA_ENV        = os.getenv("OANDA_ENV", "practice")
 
 api = API(access_token=OANDA_API_KEY, environment=OANDA_ENV)
-SYMBOLS = ["EUR_USD", "NZD_USD", "GBP_USD", "XAU_USD", "EUR_HUF", "AUD_NZD", "TRY_JPY", "GBP_CAD", "AUD_CAD", "EUR_CAD", "GBP_CHF", "CAD_HKD", "USD_THB", "AUD_HKD", "EUR_TRY"]
+SYMBOLS = ["EUR_USD", "GBP_USD", "XAU_USD"]
 
 THRESHOLD = 20
 RISK_PCT  = 0.005

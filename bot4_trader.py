@@ -190,7 +190,18 @@ async def main_loop():
                     continue
                     
                 row = df.iloc[-1]
+                
+                # --- SCORING LOGIC (RESTORED) ---
                 score = 0
+                if row.get('FVG_Bull'):        score += 25
+                if row.get('TurtleSoup_Bull'): score += 20
+                if row.get('IFVG_Bull'):       score += 22
+                if row.get('VI_Bull'):         score += 15
+                
+                if row.get('FVG_Bear'):        score -= 25
+                if row.get('TurtleSoup_Bear'): score -= 20
+                if row.get('IFVG_Bear'):       score -= 22
+                if row.get('VI_Bear'):         score -= 15
                 
                 past_25 = df.tail(25)
                 eq = (past_25['High'].max() + past_25['Low'].min()) / 2

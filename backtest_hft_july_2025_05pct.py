@@ -10,12 +10,13 @@ from oanda_data import download_oanda_candles
 SYMBOLS = ["EUR_USD", "NZD_USD", "GBP_USD", "XAU_USD", "EUR_HUF", "AUD_NZD", "TRY_JPY", "GBP_CAD", "AUD_CAD", "EUR_CAD", "GBP_CHF", "CAD_HKD", "USD_THB", "AUD_HKD", "EUR_TRY"]
 DATA_DIR = "backtest_data"
 INIT_BAL = 100000.0
-RISK_PCT = 0.005   # 0.5% Risk (Hybrid)
+RISK_PCT = 0.01    # Aggressive Hybrid (1.0%)
 RR_RATIO = 2.5    # Following bot4_trader.py
 THRESHOLD = 20    # HFT Aggressive Mode
-MAX_CONCURRENT_GLOBAL = 30 
+MAX_CONCURRENT_GLOBAL = 15 # Global account limit
 MAX_POS_PER_SYM = 2 # User requested max 2 per symbol
-MAX_UNITS_LIMIT = 100000 # Broker Safety Cap
+MAX_UNITS_MAJOR = 200000 # Major cap
+MAX_UNITS_EXOTIC = 100000 # Exotic cap
 
 def run_hybrid_backtest():
     print("=" * 60)
@@ -105,13 +106,19 @@ def run_hybrid_backtest():
                 bias = row.get("BIAS", "NEUTRAL")
                 past_25 = df.iloc[idx-25:idx]; eq = (past_25['High'].max() + past_25['Low'].min()) / 2
                 price = float(row["Close"])
+                # Sizing logic
+                is_exotic = any(x in sym for x in ["HUF", "TRY", "THB", "HKD", "MXN", "ZAR", "TRY"])
+                limit = MAX_UNITS_EXOTIC if is_exotic else MAX_UNITS_MAJOR
+                
                 units = (portfolio_balance * RISK_PCT) / (25 * pips[sym])
-                if units > MAX_UNITS_LIMIT: units = MAX_UNITS_LIMIT
+                if units > limit: units = limit
+                
+                risk_usd = units * (25 * pips[sym])
                 
                 if score >= THRESHOLD and bias == "BULLISH" and price < eq:
-                    active_trades.append({"sym": sym, "dir": "BUY", "sl": price-(25*pips[sym]), "tp": price+(25*pips[sym]*RR_RATIO), "risk_usd": units * (25 * pips[sym])})
+                    active_trades.append({"sym": sym, "dir": "BUY", "sl": price-(25*pips[sym]), "tp": price+(25*pips[sym]*RR_RATIO), "risk_usd": risk_usd})
                 elif score <= -THRESHOLD and bias == "BEARISH" and price > eq:
-                    active_trades.append({"sym": sym, "dir": "SELL", "sl": price+(25*pips[sym]), "tp": price-(25*pips[sym]*RR_RATIO), "risk_usd": units * (25 * pips[sym])})
+                    active_trades.append({"sym": sym, "dir": "SELL", "sl": price+(25*pips[sym]), "tp": price-(25*pips[sym]*RR_RATIO), "risk_usd": risk_usd})
 
     print("\n" + "=" * 60)
     print(f"   FINAL SUMMARY (LIMIT: {MAX_CONCURRENT_GLOBAL} TOTAL, 2 PER SYM)")

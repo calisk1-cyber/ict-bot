@@ -4,7 +4,7 @@ import pandas_ta as ta
 import numpy as np
 from datetime import datetime
 from ict_utils import apply_ict_v12_depth, get_smc_bias_v11
-import yfinance as yf
+from oanda_data import download_oanda_candles
 
 # --- CONFIG ---
 SYMBOLS = ["EUR_USD", "NZD_USD", "GBP_USD", "XAU_USD", "EUR_HUF", "AUD_NZD", "TRY_JPY", "GBP_CAD", "AUD_CAD", "EUR_CAD", "GBP_CHF", "CAD_HKD", "USD_THB", "AUD_HKD", "EUR_TRY"]
@@ -39,19 +39,12 @@ def run_hybrid_backtest():
         h1_path = os.path.join(DATA_DIR, f"{sym}_july_2025_H1.csv")
         
         if not os.path.exists(m5_path) or not os.path.exists(h1_path): 
-            print(f"  [DOWNLOADING] {sym} data from Yahoo (Fallback)...")
+            print(f"  [DOWNLOADING] {sym} data from Oanda (Realistic Audit)...")
             try:
-                if "XAU" in sym: yf_sym = "GC=F"
-                else: yf_sym = sym.replace("_", "") + "=X" if "USD" in sym else sym
-                
-                df = yf.download(yf_sym, period="1mo", interval="5m", progress=False)
-                df1h = yf.download(yf_sym, period="1mo", interval="1h", progress=False)
+                df = download_oanda_candles(instrument=sym, granularity="M5", count=4000)
+                df1h = download_oanda_candles(instrument=sym, granularity="H1", count=500)
                 if df.empty or df1h.empty: 
-                     print(f"  [ERROR] {sym} download failed."); continue
-                # Align columns
-                if isinstance(df.columns, pd.MultiIndex): df.columns = df.columns.droplevel(1)
-                if isinstance(df1h.columns, pd.MultiIndex): df1h.columns = df1h.columns.droplevel(1)
-                df.index.name = "Time"; df1h.index.name = "Time"
+                     print(f"  [ERROR] {sym} Oanda download failed."); continue
             except Exception as e:
                 print(f"  [ERROR] {sym} fallback failed: {e}"); continue
         else:

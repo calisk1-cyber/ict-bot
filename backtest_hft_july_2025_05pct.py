@@ -22,13 +22,26 @@ def run_hybrid_backtest():
     print(f"   Settings: Risk 0.5%, RR 1:2.5")
     print("=" * 60)
     
+    print(f"[DEBUG] Current Directory: {os.getcwd()}")
+    print(f"[DEBUG] Looking in: {os.path.abspath(DATA_DIR)}")
+    
+    if os.path.exists(DATA_DIR):
+        print(f"[DEBUG] Files in {DATA_DIR}: {os.listdir(DATA_DIR)[:10]}...")
+    else:
+        print(f"[DEBUG] ERROR: {DATA_DIR} NOT FOUND!")
+
     master_df = {}
     all_timestamps = set()
     
     for sym in SYMBOLS:
         m5_path = os.path.join(DATA_DIR, f"{sym}_july_2025_M5.csv")
         h1_path = os.path.join(DATA_DIR, f"{sym}_july_2025_H1.csv")
-        if not os.path.exists(m5_path) or not os.path.exists(h1_path): continue
+        
+        if not os.path.exists(m5_path) or not os.path.exists(h1_path):
+            print(f"  [MISSING] {sym} - Tried: {m5_path}")
+            continue
+        
+        print(f"  [FOUND] {sym} - Loading data...")
         df = pd.read_csv(m5_path, index_col="Time", parse_dates=True)
         df1h = pd.read_csv(h1_path, index_col="Time", parse_dates=True)
         bias_arr = [get_smc_bias_v11(df1h.iloc[i-20:i+1]) if i >= 20 else "NEUTRAL" for i in range(len(df1h))]

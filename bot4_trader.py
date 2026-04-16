@@ -45,6 +45,7 @@ RR_RATIO  = 2.5
 MAX_UNITS_MAJOR = 250000 
 MAX_UNITS_EXOTIC = 100000
 MAX_POS_PER_SYM  = 2     # Allowing slight scale-in
+MAX_GLOBAL_POSITIONS = 15 # User requested global limit
 MARGIN_BUFFER    = 0.85  # Moderate buffer for safety
 
 risk_manager = DailyRiskManager(initial_balance=100000.0)
@@ -86,10 +87,16 @@ def open_hft_order(sym, direction, entry, sl, tp):
             print(f"⚠️ [ULTRA CAP] {sym} {units} -> {limit if units > 0 else -limit}")
             units = limit if units > 0 else -limit
 
-        # Check existing positions for this symbol
+        # Check global limit
         r_trades = trades.TradesList(OANDA_ACCOUNT_ID)
         api.request(r_trades)
         open_trades = r_trades.response.get('trades', [])
+
+        if len(open_trades) >= MAX_GLOBAL_POSITIONS:
+            print(f"🛑 [GLOBAL LIMIT] Account already has {len(open_trades)} positions. Skipping.")
+            return False
+
+        # Check existing positions for this symbol
         sym_trades = [t for t in open_trades if t['instrument'] == sym]
         if len(sym_trades) >= MAX_POS_PER_SYM:
             print(f"🛑 [MAX POSITIONS] {sym} already has {len(sym_trades)} positions. Skipping.")

@@ -26,6 +26,7 @@ from oandapyV20.contrib.requests import StopLossOrderRequest, TakeProfitOrderReq
 from oanda_data import download_oanda_candles
 from ict_utils import apply_ict_v12_depth, get_smc_bias_v11
 from database_manager import log_trade
+from daily_risk_manager import DailyRiskManager
 
 # --- SETUP ---
 base_dir = os.path.dirname(os.path.abspath(__file__))
@@ -39,8 +40,14 @@ api = API(access_token=OANDA_API_KEY, environment=OANDA_ENV)
 SYMBOLS = ["EUR_USD", "NZD_USD", "GBP_USD", "XAU_USD", "EUR_HUF", "AUD_NZD", "TRY_JPY", "GBP_CAD", "AUD_CAD", "EUR_CAD", "GBP_CHF", "CAD_HKD", "USD_THB", "AUD_HKD", "EUR_TRY"]
 
 THRESHOLD = 20
-RISK_PCT  = 0.005
+RISK_PCT  = 0.005   # Hybrid Parity: 300+ trades target (0.5% risk)
 RR_RATIO  = 2.5
+MAX_UNITS_MAJOR = 250000 
+MAX_UNITS_EXOTIC = 100000
+MAX_POS_PER_SYM  = 2     # Allowing slight scale-in
+MARGIN_BUFFER    = 0.85  # Moderate buffer for safety
+
+risk_manager = DailyRiskManager(initial_balance=100000.0)
 
 # --- 'OCTOBER 2025' MODE: FULL AGGRESSIVE (No Limits) ---
 # Sistem, arka arkaya kayıpları göze alarak trendi sonuna kadar sömürür.
@@ -50,7 +57,10 @@ def open_hft_order(sym, direction, entry, sl, tp):
         r_acc = accounts.AccountSummary(OANDA_ACCOUNT_ID)
         api.request(r_acc)
         balance = float(r_acc.response.get('account', {}).get('balance', 1000.0))
-        risk_amount = balance * RISK_PCT 
+        risk_manager.update_date(datetime.now().date())
+        # current_risk = risk_manager.get_risk_pct() # Scaled risk disabled for ULTRA mode
+        current_risk = RISK_PCT
+        risk_amount = balance * current_risk 
         
         sl_pts = abs(entry - sl)
         if sl_pts == 0: return False
@@ -67,6 +77,31 @@ def open_hft_order(sym, direction, entry, sl, tp):
             units = int(risk_amount / sl_pts)
             
         if direction == "SELL": units = -units
+
+        # --- ULTRA-AGGRESSIVE LIMITS & CONSTRAINTS ---
+        is_exotic = any(x in sym for x in ["HUF", "TRY", "THB", "HKD", "MXN", "ZAR"])
+        limit = MAX_UNITS_EXOTIC if is_exotic else MAX_UNITS_MAJOR
+        
+        if abs(units) > limit:
+            print(f"⚠️ [ULTRA CAP] {sym} {units} -> {limit if units > 0 else -limit}")
+            units = limit if units > 0 else -limit
+
+        # Check existing positions for this symbol
+        r_trades = trades.TradesList(OANDA_ACCOUNT_ID)
+        api.request(r_trades)
+        open_trades = r_trades.response.get('trades', [])
+        sym_trades = [t for t in open_trades if t['instrument'] == sym]
+        if len(sym_trades) >= MAX_POS_PER_SYM:
+            print(f"🛑 [MAX POSITIONS] {sym} already has {len(sym_trades)} positions. Skipping.")
+            return False
+
+        # Check margin available
+        margin_avail = float(r_acc.response.get('account', {}).get('marginAvailable', 0.0))
+        # Estimate margin (approx 2% of notional)
+        estimated_margin = (abs(units) * entry * 0.02) if "JPY" not in sym else (abs(units) * (entry/100) * 0.02)
+        if estimated_margin > margin_avail * MARGIN_BUFFER: 
+            print(f"🛑 [MARGIN SHORTGE] Needed: {estimated_margin:.2f}, Avail: {margin_avail:.2f}. Skipping.")
+            return False
 
         # Precision handling (JPY/THB/HUF/XAU use 3 decimals, others 5)
         precision_map = {
@@ -93,6 +128,7 @@ def open_hft_order(sym, direction, entry, sl, tp):
         trade_id = fill_data.get('tradeOpened', {}).get('tradeID')
         
         if trade_id:
+            risk_manager.register_trade_result(0) # Register zero first, actual PnL comes later
             sl_created = any(x in order_resp for x in ['stopLossOrderFillTransaction', 'stopLossOrderCreated'])
             tp_created = any(x in order_resp for x in ['takeProfitOrderFillTransaction', 'takeProfitOrderCreated'])
             

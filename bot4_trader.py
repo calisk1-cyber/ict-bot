@@ -40,7 +40,7 @@ api = API(access_token=OANDA_API_KEY, environment=OANDA_ENV)
 SYMBOLS = ["EUR_USD", "NZD_USD", "GBP_USD", "XAU_USD", "EUR_HUF", "AUD_NZD", "TRY_JPY", "GBP_CAD", "AUD_CAD", "EUR_CAD", "GBP_CHF", "CAD_HKD", "USD_THB", "AUD_HKD", "EUR_TRY"]
 
 THRESHOLD = 20
-RISK_PCT  = 0.005   # Hybrid Parity: 300+ trades target (0.5% risk)
+RISK_PCT  = 0.01    # Hybrid Aggressive: 1.0% risk (max 15 global)
 RR_RATIO  = 2.5
 MAX_UNITS_MAJOR = 250000 
 MAX_UNITS_EXOTIC = 100000

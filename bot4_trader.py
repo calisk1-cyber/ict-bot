@@ -42,11 +42,21 @@ SYMBOLS = ["EUR_USD", "NZD_USD", "GBP_USD", "XAU_USD", "EUR_HUF", "AUD_NZD", "TR
 THRESHOLD = 20
 RISK_PCT  = 0.01    # Hybrid Aggressive: 1.0% risk (max 15 global)
 RR_RATIO  = 2.5
-MAX_UNITS_MAJOR = 200000   # Adjusted to 200k as requested
-MAX_UNITS_EXOTIC = 100000  # Optimized for 15 concurrent trades
-MAX_POS_PER_SYM  = 2     # Allowing slight scale-in
-MAX_GLOBAL_POSITIONS = 15 # User requested global limit
-MARGIN_BUFFER    = 0.85  # Moderate buffer for safety
+MAX_UNITS_MAJOR = 200000
+MAX_UNITS_EXOTIC = 50000   # Reduced for safer exotic execution
+MAX_POS_PER_SYM  = 1       # STRICT FIFO: One position at a time per symbol
+MAX_GLOBAL_POSITIONS = 15
+MARGIN_BUFFER    = 0.80    # Increased buffer
+
+# Per-symbol unit caps for highly restrictive exotics
+SYMBOL_UNIT_LIMITS = {
+    "TRY_JPY": 25000,
+    "USD_THB": 50000,
+    "EUR_HUF": 50000,
+    "CAD_HKD": 75000,
+    "AUD_HKD": 75000,
+    "EUR_TRY": 25000
+}
 
 risk_manager = DailyRiskManager(initial_balance=100000.0)
 
@@ -59,55 +69,57 @@ def open_hft_order(sym, direction, entry, sl, tp):
         api.request(r_acc)
         balance = float(r_acc.response.get('account', {}).get('balance', 1000.0))
         risk_manager.update_date(datetime.now().date())
-        # current_risk = risk_manager.get_risk_pct() # Scaled risk disabled for ULTRA mode
+        
         current_risk = RISK_PCT
         risk_amount = balance * current_risk 
         
         sl_pts = abs(entry - sl)
         if sl_pts == 0: return False
         
-        # --- INSTITUTIONAL UNIT HAKKEDİŞ (FIXED) ---
+        # --- UNIT CALCULATION ---
         if "XAU" in sym:
-            # 1 Unit Gold = 1 Ounce. Pip = 0.10.
             units = int(risk_amount / sl_pts)
         elif "JPY" in sym:
-            # USD/JPY: Units = Risk / (Dist / Entry)
             units = int(risk_amount / (sl_pts / entry))
         else:
-            # EUR_USD, GBP_USD etc: Units = Risk / Dist
             units = int(risk_amount / sl_pts)
             
         if direction == "SELL": units = -units
 
-        # --- ULTRA-AGGRESSIVE LIMITS & CONSTRAINTS ---
-        is_exotic = any(x in sym for x in ["HUF", "TRY", "THB", "HKD", "MXN", "ZAR"])
-        limit = MAX_UNITS_EXOTIC if is_exotic else MAX_UNITS_MAJOR
-        
-        if abs(units) > limit:
-            print(f"⚠️ [ULTRA CAP] {sym} {units} -> {limit if units > 0 else -limit}")
-            units = limit if units > 0 else -limit
-
-        # Check global limit
+        # --- POSITION LIMITS & FIFO PROTECTION ---
+        # 1. Check existing positions
         r_trades = trades.TradesList(OANDA_ACCOUNT_ID)
         api.request(r_trades)
         open_trades = r_trades.response.get('trades', [])
 
+        # FIFO PROTECT: If any trade for this sym exists, skip.
+        # This prevents both scale-in (multiple same dirs) and hedging (opposing dirs).
+        sym_trades = [t for t in open_trades if t['instrument'] == sym]
+        if len(sym_trades) >= MAX_POS_PER_SYM:
+            print(f"🛑 [FIFO PROTECT] {sym} already has an active trade. Skipping.")
+            return False
+
+        # 2. Global Limit Check
         if len(open_trades) >= MAX_GLOBAL_POSITIONS:
             print(f"🛑 [GLOBAL LIMIT] Account already has {len(open_trades)} positions. Skipping.")
             return False
 
-        # Check existing positions for this symbol
-        sym_trades = [t for t in open_trades if t['instrument'] == sym]
-        if len(sym_trades) >= MAX_POS_PER_SYM:
-            print(f"🛑 [MAX POSITIONS] {sym} already has {len(sym_trades)} positions. Skipping.")
-            return False
+        # 3. Dynamic Unit Capping
+        is_exotic = any(x in sym for x in ["HUF", "TRY", "THB", "HKD", "MXN", "ZAR", "SGD"])
+        symbol_limit = SYMBOL_UNIT_LIMITS.get(sym, MAX_UNITS_EXOTIC if is_exotic else MAX_UNITS_MAJOR)
+        
+        if abs(units) > symbol_limit:
+            print(f"⚠️ [UNIT CAP] {sym} {units} -> {symbol_limit if units > 0 else -symbol_limit}")
+            units = symbol_limit if units > 0 else -symbol_limit
 
-        # Check margin available
+        # 4. Margin available check
         margin_avail = float(r_acc.response.get('account', {}).get('marginAvailable', 0.0))
-        # Estimate margin (approx 2% of notional)
-        estimated_margin = (abs(units) * entry * 0.02) if "JPY" not in sym else (abs(units) * (entry/100) * 0.02)
+        # Conservatively estimate 5% margin for exotics, 2% for majors
+        margin_req_pct = 0.05 if is_exotic else 0.02
+        estimated_margin = (abs(units) * entry * margin_req_pct) if "JPY" not in sym else (abs(units) * (entry/100) * margin_req_pct)
+        
         if estimated_margin > margin_avail * MARGIN_BUFFER: 
-            print(f"🛑 [MARGIN SHORTGE] Needed: {estimated_margin:.2f}, Avail: {margin_avail:.2f}. Skipping.")
+            print(f"🛑 [MARGIN SHORTAGE] Needed: {estimated_margin:.2f}, Avail: {margin_avail:.2f}. Skipping.")
             return False
 
         # Precision handling (JPY/THB/HUF/XAU use 3 decimals, others 5)

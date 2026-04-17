@@ -324,7 +324,11 @@ async def main():
     init_database()
     threading.Thread(target=run_flask, daemon=True).start()
     print("ICT SINGULARITY V9.2 - DASHBOARD LIVE AT http://localhost:5000")
-    await stream_prices_loop()
+    # Redundant trading loop disabled to prevent FIFO/Position conflicts with bot4_trader.py
+    # await stream_prices_loop()
+    # Stay alive while Flask runs in thread
+    while True:
+        await asyncio.sleep(3600)
 
 if __name__ == "__main__":
     asyncio.run(main())

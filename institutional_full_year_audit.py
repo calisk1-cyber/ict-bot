@@ -7,11 +7,8 @@ from ict_utils import apply_ict_v18_omniscient, get_smc_bias_v11
 import time
 import os
 
-# --- V18 INSTITUTIONAL 1-YEAR BACKTESTER ---
-# This script uses the exact Ultra-Stabil parameters:
-# 1. Correct Units Calculation (JPY, GOLD, FX)
-# 2. Institutional Spread & Slippage
-# 3. 1:2.5 R/R Ratio (Recalibrated for Cost Neutralization)
+# --- V18 PRO: INSTITUTIONAL 1-YEAR AUDIT (ULTRA-STABIL) ---
+# Version: 2.1 (H4 Bias + Robust Chunking)
 
 class FullYearInstitutionalBacktester:
     def __init__(self, initial_balance=100000):
@@ -19,16 +16,12 @@ class FullYearInstitutionalBacktester:
         self.balance = initial_balance
         self.trades = []
         
-        # Institutional Costs (Average Real-World)
+        # Institutional Costs
         self.SPREADS = {"EUR_USD": 0.00008, "GBP_USD": 0.00012, "XAU_USD": 0.35, "USD_JPY": 0.008, "USD_CAD": 0.00015}
         self.COMMISSION_PER_LOT = 7.0 
         
         self.symbol_meta = {
-            "EUR_USD": {"pip": 0.0001, "jpy": False},
-            "GBP_USD": {"pip": 0.0001, "jpy": False},
-            "XAU_USD": {"pip": 0.1, "jpy": False},
-            "USD_JPY": {"pip": 0.01, "jpy": True},
-            "USD_CAD": {"pip": 0.0001, "jpy": False}
+            "EUR_USD": {"pip": 0.0001}, "XAU_USD": {"pip": 0.1}, "USD_JPY": {"pip": 0.01}
         }
 
     def calculate_units(self, ticker, entry, sl, risk_usd):
@@ -37,131 +30,123 @@ class FullYearInstitutionalBacktester:
         if "XAU" in ticker:
             return int(risk_usd / sl_dist)
         elif "JPY" in ticker:
-            # Proper USD/JPY Units Math
             return int(risk_usd / (sl_dist / entry))
         else:
             return int(risk_usd / sl_dist)
 
-    def run_simulation(self, ticker, start_date, end_date):
-        print(f"\n[AUDIT] Fetching data for {ticker} ({start_date} to {end_date})...")
+    def run_simulation(self, ticker, start_yr, end_yr):
+        print(f"\n[AUDIT] Starting 1-Year Audit for {ticker}...")
         
+        # Process monthly chunks to prevent Rate Limit / Oanda Connection issues
+        current_date = datetime(2025, 1, 1)
+        final_date = datetime(2025, 12, 31)
+        
+        while current_date < final_date:
+            month_end = current_date + timedelta(days=32)
+            month_end = month_end.replace(day=1) - timedelta(seconds=1)
+            if month_end > final_date: month_end = final_date
+            
+            s_str = current_date.strftime("%Y-%m-%d")
+            e_str = month_end.strftime("%Y-%m-%d")
+            
+            print(f"  --> Chunk: {s_str} to {e_str}")
+            self.process_chunk(ticker, s_str, e_str)
+            
+            current_date = month_end + timedelta(seconds=1)
+            time.sleep(2) # Breath for Oanda
+
+    def process_chunk(self, ticker, s_str, e_str):
         try:
-            # We use Oanda's Factory via download_oanda_candles to handle 1 year of M5 data (~105k candles)
-            df = download_oanda_candles(ticker, "M5", from_time=f"{start_date}T00:00:00Z", to_time=f"{end_date}T00:00:00Z")
+            # 1. Fetch M5 Data
+            df = download_oanda_candles(ticker, "M5", from_time=f"{s_str}T00:00:00Z", to_time=f"{e_str}T23:59:59Z")
+            if df.empty: return
             
-            if df.empty:
-                print(f"  Warning: No data found for {ticker}")
-                return
-            
-            print(f"  Processing {len(df)} candles...")
             df = apply_ict_v18_omniscient(df)
             
-            # Fetch H1 for correct Bias alignment
-            print(f"  Fetching H1 data for Precise Bias...")
-            df_h1 = download_oanda_candles(ticker, "H1", from_time=f"{start_date}T00:00:00Z", to_time=f"{end_date}T00:00:00Z")
+            # 2. Fetch H4 Data for Bias
+            df_h4 = download_oanda_candles(ticker, "H4", from_time=f"{s_str}T00:00:00Z", to_time=f"{e_str}T23:59:59Z")
             
-            # Map H1 Bias to M5 rows (Aligning to the latest available H1 candle)
-            print(f"  Mapping HTF Bias to M5 timeframe...")
-            if not df_h1.empty:
-                # Calculate bias for each H1 candle
-                h1_biases = []
-                for j in range(len(df_h1)):
-                    window = df_h1.iloc[max(0, j-20):j+1]
-                    h1_biases.append(get_smc_bias_v11(window))
-                df_h1['calculated_bias'] = h1_biases
+            # 3. Handle Bias Mapping
+            if not df_h4.empty:
+                h4_biases = []
+                for j in range(len(df_h4)):
+                    window = df_h4.iloc[max(0, j-20):j+1]
+                    h4_biases.append(str(get_smc_bias_v11(window)))
+                df_h4['calculated_bias'] = h4_biases
                 
-                # Merge M5 with H1 bias
-                df = pd.merge_asof(
-                    df.sort_index(), 
-                    df_h1[['calculated_bias']].sort_index(), 
-                    left_index=True, 
-                    right_index=True, 
-                    direction='backward'
-                )
+                # Careful Merge
+                df = df.sort_index()
+                df_h4 = df_h4.sort_index()
+                df = pd.merge_asof(df, df_h4[['calculated_bias']], left_index=True, right_index=True, direction='backward')
                 df.rename(columns={'calculated_bias': 'HTF_Bias'}, inplace=True)
                 df['HTF_Bias'] = df['HTF_Bias'].fillna("NEUTRAL")
             else:
                 df['HTF_Bias'] = "NEUTRAL"
-            
+
+            # 4. Step through M5 candles
             active_trade = None
-            spread_points = self.SPREADS.get(ticker, 0.0002)
+            spread = self.SPREADS.get(ticker, 0.0001)
             meta = self.symbol_meta[ticker]
             
             for i in range(len(df)-1):
                 row = df.iloc[i]
-                next_row = df.iloc[i+1]
+                nxt = df.iloc[i+1]
                 
                 if active_trade:
-                    # Check SL/TP
                     if active_trade['side'] == "BUY":
-                        if next_row['Low'] <= active_trade['sl']:
+                        if nxt['Low'] <= active_trade['sl']:
                             self.close_trade(active_trade, active_trade['sl'], "SL")
                             active_trade = None
-                        elif next_row['High'] >= active_trade['tp']:
+                        elif nxt['High'] >= active_trade['tp']:
                             self.close_trade(active_trade, active_trade['tp'], "TP")
                             active_trade = None
                     else:
-                        if next_row['High'] >= active_trade['sl']:
+                        if nxt['High'] >= active_trade['sl']:
                             self.close_trade(active_trade, active_trade['sl'], "SL")
                             active_trade = None
-                        elif next_row['Low'] <= active_trade['tp']:
+                        elif nxt['Low'] <= active_trade['tp']:
                             self.close_trade(active_trade, active_trade['tp'], "TP")
                             active_trade = None
                     continue
 
-                # Signal Detection
                 if not row.get('is_algo_window'): continue
                 
-                bias = row.get('HTF_Bias', 'NEUTRAL')
+                bias = str(row.get('HTF_Bias', 'NEUTRAL'))
                 is_bull = row.get('CISD_Bull', False) and bias == "BULLISH"
                 is_bear = row.get('CISD_Bear', False) and bias == "BEARISH"
                 
                 if is_bull or is_bear:
-                    slip = random.uniform(0.3, 0.8) * meta['pip']
-                    entry_p = next_row['Open'] + (spread_points/2) + slip if is_bull else next_row['Open'] - (spread_points/2) - slip
+                    slip = random.uniform(0.3, 0.7) * meta['pip']
+                    ent = nxt['Open'] + (spread/2) + slip if is_bull else nxt['Open'] - (spread/2) - slip
                     
-                    # 1:2.5 RR recalibration
                     sl_dist = 25 * meta['pip']
-                    sl = entry_p - sl_dist if is_bull else entry_p + sl_dist
-                    tp = entry_p + (entry_p - sl) * 2.5
+                    sl = ent - sl_dist if is_bull else ent + sl_dist
+                    tp = ent + (ent - sl) * 2.5
                     
-                    units = self.calculate_units(ticker, entry_p, sl, self.balance * 0.01)
-                    active_trade = {"side": "BUY" if is_bull else "SELL", "entry": entry_p, "sl": sl, "tp": tp, "units": units}
+                    u = self.calculate_units(ticker, ent, sl, self.balance * 0.01)
+                    if u > 0:
+                        active_trade = {"symbol": ticker, "side": "BUY" if is_bull else "SELL", "entry": ent, "sl": sl, "tp": tp, "units": u}
         except Exception as e:
-            print(f"Error on {ticker}: {e}")
+            print(f"  [ERROR] Chunk {s_str} failed: {e}")
 
-    def close_trade(self, trade, close_p, reason):
-        pnl_raw = (close_p - trade['entry']) * trade['units'] if trade['side'] == "BUY" else (trade['entry'] - close_p) * trade['units']
-        
-        # --- CURRENCY CONVERSION (FIXED) ---
-        # For USD_JPY, PnL is in JPY and must be converted to USD (Base Currency)
-        if "JPY" in trade['symbol']:
-            pnl_usd = pnl_raw / close_p
-        else:
-            pnl_usd = pnl_raw
-            
+    def close_trade(self, trade, cp, rsn):
+        p_raw = (cp - trade['entry']) * trade['units'] if trade['side'] == "BUY" else (trade['entry'] - cp) * trade['units']
+        p_usd = p_raw / cp if "JPY" in trade['symbol'] else p_raw
         comm = (abs(trade['units']) / 100000.0) * self.COMMISSION_PER_LOT
-        self.balance += (pnl_usd - comm)
-        self.trades.append({"symbol": trade['symbol'], "pnl": pnl_usd - comm, "reason": reason})
+        self.balance += (p_usd - comm)
+        self.trades.append({"symbol": trade['symbol'], "pnl": p_usd - comm})
 
     def report(self):
-        df_trades = pd.DataFrame(self.trades)
-        if df_trades.empty:
-            print("No trades executed.")
+        dt = pd.DataFrame(self.trades)
+        if dt.empty:
+            print("No trades found.")
             return
-        win_rate = (len(df_trades[df_trades['pnl'] > 0]) / len(df_trades)) * 100
-        print(f"\n==================================================")
-        print(f"   V18 INSTITUTIONAL 1-YEAR AUDIT (2025)")
-        print(f"==================================================")
-        print(f"Total Trades: {len(df_trades)}")
-        print(f"Win Rate:     {win_rate:.1f}%")
-        print(f"Final Balance: ${self.balance:.2f}")
-        print(f"Net Profit:   ${self.balance - self.initial_balance:.2f}")
-        print(f"==================================================\n")
+        wr = (len(dt[dt['pnl'] > 0]) / len(dt)) * 100
+        print(f"\n{'='*50}\n  V18 INSTITUTIONAL 2025 AUDIT REPORT\n{'='*50}")
+        print(f"Total Trades: {len(dt)}\nWin Rate:     {wr:.1f}%\nNet PnL:      ${self.balance - self.initial_balance:.2f}\nFinal Bal:    ${self.balance:.2f}\n{'='*50}\n")
 
 if __name__ == "__main__":
-    tester = FullYearInstitutionalBacktester()
-    symbols = ["EUR_USD", "XAU_USD", "USD_JPY"]
-    for s in symbols:
-        tester.run_simulation(s, "2025-01-01", "2025-12-31")
-    tester.report()
+    t = FullYearInstitutionalBacktester()
+    for s in ["EUR_USD", "XAU_USD", "USD_JPY"]:
+        t.run_simulation(s, 2025, 2025)
+    t.report()

@@ -1,36 +1,35 @@
 import os
 import oandapyV20
-import oandapyV20.endpoints.trades as trades
-import oandapyV20.endpoints.accounts as accounts
+import oandapyV20.endpoints.transactions as trans
 from dotenv import load_dotenv
-import json
 
 load_dotenv()
 
-OANDA_API_KEY = os.getenv("OANDA_API_KEY")
-OANDA_ACCOUNT_ID = os.getenv("OANDA_ACCOUNT_ID")
-OANDA_ENV = os.getenv("OANDA_ENV", "practice")
+def check_history():
+    access_token = os.getenv("OANDA_API_KEY")
+    account_id = os.getenv("OANDA_ACCOUNT_ID")
+    client = oandapyV20.API(access_token=access_token, environment=os.getenv("OANDA_ENV", "practice"))
+    
+    # Get the last 20 transactions
+    r = trans.TransactionList(accountID=account_id)
+    client.request(r)
+    last_id = int(r.response.get('lastTransactionID'))
+    
+    print(f"--- [RECENT HISTORY] Checking last 20 transactions (up to ID {last_id}) ---")
+    
+    # Fetch details for the range
+    r_details = trans.TransactionIDRange(accountID=account_id, params={"from": max(1, last_id-20), "to": last_id})
+    client.request(r_details)
+    
+    for t in r_details.response.get('transactions', []):
+        t_type = t.get('type')
+        t_time = t.get('time')
+        t_instrument = t.get('instrument', 'N/A')
+        
+        if t_type in ['ORDER_FILL', 'ORDER_CANCEL', 'MARKET_ORDER', 'LIMIT_ORDER', 'ORDER_REJECT']:
+            print(f"[{t_time}] {t_type} | {t_instrument} | Status: {t.get('reason', 'N/A')}")
+            if t_type == 'ORDER_CANCEL':
+                print(f"  --> Cancel Reason: {t.get('reason')}")
 
-client = oandapyV20.API(access_token=OANDA_API_KEY, environment=OANDA_ENV)
-
-print(f"--- OANDA HESAP OZETI ({OANDA_ACCOUNT_ID}) ---")
-r_acc = accounts.AccountSummary(accountID=OANDA_ACCOUNT_ID)
-client.request(r_acc)
-acc = r_acc.response.get('account', {})
-print(f"Bakiye: {acc.get('balance')}")
-print(f"Acik Pozisyon Sayisi: {acc.get('openPositionCount')}")
-
-print("\n--- SON 10 ISLEM ---")
-params = {"state": "ALL", "count": 10}
-r_trades = trades.TradesList(accountID=OANDA_ACCOUNT_ID, params=params)
-client.request(r_trades)
-
-transactions = r_trades.response.get('trades', [])
-for t in transactions:
-    # Bazen realizedPL alanı olmayabilir veya farklı bir isimde olabilir
-    pl = t.get('realizedPL', '0.00')
-    time_str = t.get('openTime', 'Bilinmiyor')
-    print(f"Tarih: {time_str} | ID: {t['id']} | Enstruman: {t['instrument']} | Unit: {t['initialUnits']} | Durum: {t['state']} | PnL: {pl}")
-
-if not transactions:
-    print("Islem bulunamadi.")
+if __name__ == "__main__":
+    check_history()

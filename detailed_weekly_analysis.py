@@ -53,11 +53,11 @@ def perform_analysis():
     
     df = pd.DataFrame(data)
     
-    # Range for "This Week" (Starts Monday April 13, 2026)
-    start_of_week = pd.Timestamp("2026-04-13").tz_localize('UTC')
+    # Range for "Extended Week" (Starts Thursday April 09, 2026)
+    start_of_week = pd.Timestamp("2026-04-09").tz_localize('UTC')
     today = pd.Timestamp.now(tz='UTC')
     
-    # Filter for this week
+    # Filter for extended week
     weekly_df = df[df['CloseTime'] >= start_of_week]
     
     # Filter for last 30 days (for Sharpe)

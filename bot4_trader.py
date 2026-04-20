@@ -42,19 +42,19 @@ SYMBOLS = ["EUR_USD", "NZD_USD", "GBP_USD", "XAU_USD", "EUR_HUF", "AUD_NZD", "TR
 THRESHOLD = 20
 RISK_PCT  = 0.01    # Hybrid Aggressive: 1.0% risk (max 15 global)
 RR_RATIO  = 2.5
-MAX_UNITS_MAJOR = 200000
-MAX_UNITS_EXOTIC = 50000   # Reduced for safer exotic execution
-MAX_POS_PER_SYM  = 1       # STRICT FIFO: One position at a time per symbol
+MAX_UNITS_MAJOR = 400000   # Restored: allows full 1% natural sizing (~388k on majors)
+MAX_UNITS_EXOTIC = 100000  # Restored: safer exotics cap
+MAX_POS_PER_SYM  = 2       # Restored: scale-in allowed (high-win mode)
 MAX_GLOBAL_POSITIONS = 15
-MARGIN_BUFFER    = 0.80    # Increased buffer
+MARGIN_BUFFER    = 0.90    # Restored: more room for large positions
 
 # Per-symbol unit caps for highly restrictive exotics
 SYMBOL_UNIT_LIMITS = {
     "TRY_JPY": 25000,
     "USD_THB": 50000,
     "EUR_HUF": 50000,
-    "CAD_HKD": 75000,
-    "AUD_HKD": 75000,
+    "CAD_HKD": 100000,  # Restored
+    "AUD_HKD": 100000,  # Restored
     "EUR_TRY": 25000
 }
 
